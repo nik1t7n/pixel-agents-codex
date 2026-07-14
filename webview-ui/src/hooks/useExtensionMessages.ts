@@ -11,7 +11,6 @@ import { setCharacterTemplates } from '../office/sprites/spriteData.js';
 import { getLoadedCharacterCount } from '../office/sprites/spriteData.js';
 import {
   extractToolName,
-  isSubagentToolName,
   setProviderCapabilities,
   stableAgentAppearance,
 } from '../office/toolUtils.js';
@@ -408,29 +407,14 @@ export function useExtensionMessages(
         });
         const toolName = (msg.toolName as string | undefined) ?? extractToolName(status);
         os.setAgentTool(id, toolName, status);
-        os.setAgentActive(id, true);
+        if (toolName === 'wait_agent' || toolName === 'wait') {
+          os.setAgentWaitingForAgents(id);
+        } else {
+          os.setAgentActive(id, true);
+        }
         // Don't clear the permission bubble if the hook already confirmed permission is needed
         if (!permissionActive) {
           os.clearPermissionBubble(id);
-        }
-        // Create sub-agent character for Task/Agent tool subtasks.
-        // agentToolStart for Task/Agent is always emitted via JSONL (with the stable
-        // toolu_* id), never from the hook path — handlePreToolUse skips these tools.
-        // runInBackground routing:
-        //   - parent HAS teamName: teammate path (onTeammateDetected) creates the
-        //     teammate; we skip here so we don't spawn a ghost sub-agent alongside.
-        //   - parent has NO teamName: no teammate path exists, so we must still
-        //     create the Subtask sub-character or the background task is invisible.
-        const runInBackground = msg.runInBackground as boolean | undefined;
-        const parentChar = os.characters.get(id);
-        const parentHasTeam = !!parentChar?.teamName;
-        if (isSubagentToolName(toolName) && (!runInBackground || !parentHasTeam)) {
-          const label = status.startsWith('Subtask:') ? status.slice('Subtask:'.length).trim() : '';
-          const subId = os.addSubagent(id, toolId);
-          setSubagentCharacters((prev) => {
-            if (prev.some((s) => s.id === subId)) return prev;
-            return [...prev, { id: subId, parentAgentId: id, parentToolId: toolId, label }];
-          });
         }
       } else if (msg.type === 'agentToolDone') {
         const id = msg.id as number;
@@ -551,15 +535,6 @@ export function useExtensionMessages(
             [id]: { ...agentSubs, [parentToolId]: [...list, { toolId, status, done: false }] },
           };
         });
-        // Update sub-agent character's tool and active state. The sub-agent was
-        // created by an earlier agentToolStart from JSONL using the same (real)
-        // parentToolId, so this lookup resolves.
-        const subId = os.getSubagentId(id, parentToolId);
-        if (subId !== null) {
-          const subToolName = extractToolName(status);
-          os.setAgentTool(subId, subToolName, status);
-          os.setAgentActive(subId, true);
-        }
       } else if (msg.type === 'subagentToolDone') {
         const id = msg.id as number;
         const parentToolId = msg.parentToolId as string;
@@ -592,11 +567,6 @@ export function useExtensionMessages(
           }
           return { ...prev, [id]: next };
         });
-        // Remove sub-agent character
-        os.removeSubagent(id, parentToolId);
-        setSubagentCharacters((prev) =>
-          prev.filter((s) => !(s.parentAgentId === id && s.parentToolId === parentToolId)),
-        );
       } else if (msg.type === 'characterSpritesLoaded') {
         const characters = msg.characters as Array<{
           down: string[][][];

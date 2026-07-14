@@ -657,6 +657,16 @@ export class OfficeState {
     }
   }
 
+  setAgentWaitingForAgents(id: number): void {
+    const ch = this.characters.get(id);
+    if (!ch) return;
+    this.setAgentActive(id, false);
+    ch.state = CharacterState.IDLE;
+    ch.wanderTimer = 0;
+    ch.wanderCount = 0;
+    ch.wanderLimit = Number.MAX_SAFE_INTEGER;
+  }
+
   /** Rebuild furniture instances with auto-state applied (active agents turn electronics ON) */
   private rebuildFurnitureInstances(): void {
     // Collect tiles where active agents face desks

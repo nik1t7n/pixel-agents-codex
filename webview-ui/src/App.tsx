@@ -148,7 +148,10 @@ function App() {
     let previous = officeStateRef.current?.selectedAgentId ?? null;
     const requestedAgentParam = new URL(window.location.href).searchParams.get('agent');
     const requestedAgent = requestedAgentParam === null ? NaN : Number(requestedAgentParam);
-    let restoredRequestedAgent = !Number.isInteger(requestedAgent);
+    let restoredRequestedAgent = !Number.isInteger(requestedAgent) || requestedAgent <= 0;
+    if (Number.isInteger(requestedAgent) && requestedAgent <= 0) {
+      replaceUrlState(openedSession.id, null);
+    }
     const timer = window.setInterval(() => {
       if (!restoredRequestedAgent) {
         if (!officeStateRef.current?.characters.has(requestedAgent)) return;
