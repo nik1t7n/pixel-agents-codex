@@ -79,6 +79,9 @@ components:
       oneOf:
         # Provider capabilities
         - $ref: '#/components/schemas/ProviderCapabilities'
+        - $ref: '#/components/schemas/SessionCatalog'
+        - $ref: '#/components/schemas/SessionOpened'
+        - $ref: '#/components/schemas/SessionOpenFailed'
         # Agent lifecycle
         - $ref: '#/components/schemas/AgentCreated'
         - $ref: '#/components/schemas/AgentClosed'
@@ -118,6 +121,9 @@ components:
     ClientMessage:
       oneOf:
         - $ref: '#/components/schemas/WebviewReady'
+        - $ref: '#/components/schemas/OpenSession'
+        - $ref: '#/components/schemas/CloseSession'
+        - $ref: '#/components/schemas/RefreshSessionCatalog'
         - $ref: '#/components/schemas/LaunchAgent'
         - $ref: '#/components/schemas/FocusAgent'
         - $ref: '#/components/schemas/CloseAgent'
@@ -160,6 +166,72 @@ components:
           items:
             type: string
           description: Tool names that spawn sub-agent characters (e.g. Task, Agent).
+
+    CodexSessionSummary:
+      type: object
+      additionalProperties: false
+      required: [id, title, updatedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        updatedAt:
+          type: string
+
+    OpenedCodexSession:
+      type: object
+      additionalProperties: false
+      required: [id, title, updatedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        updatedAt:
+          type: string
+        cwd:
+          type: string
+        originator:
+          type: string
+
+    SessionCatalog:
+      type: object
+      additionalProperties: false
+      required: [type, sessions]
+      properties:
+        type:
+          const: sessionCatalog
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodexSessionSummary'
+        selectedSession:
+          $ref: '#/components/schemas/OpenedCodexSession'
+
+    SessionOpened:
+      type: object
+      additionalProperties: false
+      required: [type, session, agentId]
+      properties:
+        type:
+          const: sessionOpened
+        session:
+          $ref: '#/components/schemas/OpenedCodexSession'
+        agentId:
+          type: integer
+
+    SessionOpenFailed:
+      type: object
+      additionalProperties: false
+      required: [type, sessionId, message]
+      properties:
+        type:
+          const: sessionOpenFailed
+        sessionId:
+          type: string
+        message:
+          type: string
 
     AgentCreated:
       description: A new agent has appeared in the office.
@@ -398,9 +470,11 @@ components:
           type: integer
         teamUsesTmux:
           type: boolean
+        folderName:
+          type: string
 
     AgentTokenUsage:
-      description: Cumulative token usage for the agent's session.
+      description: Current Codex model and context usage for an agent.
       type: object
       additionalProperties: false
       required: [type, id, inputTokens, outputTokens]
@@ -413,6 +487,14 @@ components:
           type: integer
         outputTokens:
           type: integer
+        model:
+          type: string
+        contextWindow:
+          type: integer
+        effort:
+          type: string
+        multiAgentVersion:
+          type: string
 
     LayoutLoaded:
       description: |
@@ -666,6 +748,32 @@ components:
       properties:
         type:
           const: webviewReady
+
+    OpenSession:
+      type: object
+      additionalProperties: false
+      required: [type, sessionId]
+      properties:
+        type:
+          const: openSession
+        sessionId:
+          type: string
+
+    CloseSession:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          const: closeSession
+
+    RefreshSessionCatalog:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          const: refreshSessionCatalog
 
     LaunchAgent:
       description: Launch a new Claude agent in a new terminal.

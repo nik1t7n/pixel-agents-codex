@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import type { CodexSessionSummary, OpenedCodexSession } from '../../../core/src/messages.js';
 import { playDoneSound, playPermissionSound, setSoundEnabled } from '../notificationSound.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { setFloorSprites } from '../office/floorTiles.js';
@@ -72,6 +73,9 @@ interface ExtensionMessageState {
   hooksEnabled: boolean;
   setHooksEnabled: (v: boolean) => void;
   hooksInfoShown: boolean;
+  sessions: CodexSessionSummary[];
+  openedSession: OpenedCodexSession | null;
+  sessionError: string | null;
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -109,6 +113,9 @@ export function useExtensionMessages(
   const [alwaysShowLabels, setAlwaysShowLabels] = useState(false);
   const [hooksEnabled, setHooksEnabled] = useState(true);
   const [hooksInfoShown, setHooksInfoShown] = useState(true);
+  const [sessions, setSessions] = useState<CodexSessionSummary[]>([]);
+  const [openedSession, setOpenedSession] = useState<OpenedCodexSession | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   // Track whether initial layout has been loaded (ref to avoid re-render)
   const layoutReadyRef = useRef(false);
@@ -152,6 +159,24 @@ export function useExtensionMessages(
           readingTools: msg.readingTools,
           subagentToolNames: msg.subagentToolNames,
         });
+        return;
+      }
+
+      if (msg.type === 'sessionCatalog') {
+        setSessions(msg.sessions);
+        setOpenedSession(msg.selectedSession ?? null);
+        setSessionError(null);
+        return;
+      }
+
+      if (msg.type === 'sessionOpened') {
+        setOpenedSession(msg.session);
+        setSessionError(null);
+        return;
+      }
+
+      if (msg.type === 'sessionOpenFailed') {
+        setSessionError(msg.message);
         return;
       }
 
@@ -284,7 +309,7 @@ export function useExtensionMessages(
           };
         });
         const toolName = (msg.toolName as string | undefined) ?? extractToolName(status);
-        os.setAgentTool(id, toolName);
+        os.setAgentTool(id, toolName, status);
         os.setAgentActive(id, true);
         // Don't clear the permission bubble if the hook already confirmed permission is needed
         if (!permissionActive) {
@@ -425,7 +450,7 @@ export function useExtensionMessages(
         const subId = os.getSubagentId(id, parentToolId);
         if (subId !== null) {
           const subToolName = extractToolName(status);
-          os.setAgentTool(subId, subToolName);
+          os.setAgentTool(subId, subToolName, status);
           os.setAgentActive(subId, true);
         }
       } else if (msg.type === 'subagentToolDone') {
@@ -549,10 +574,16 @@ export function useExtensionMessages(
           msg.isTeamLead as boolean | undefined,
           msg.leadAgentId as number | undefined,
           msg.teamUsesTmux as boolean | undefined,
+          msg.folderName as string | undefined,
         );
       } else if (msg.type === 'agentTokenUsage') {
         const id = msg.id as number;
-        os.setAgentTokens(id, msg.inputTokens as number, msg.outputTokens as number);
+        os.setAgentTokens(id, msg.inputTokens as number, msg.outputTokens as number, {
+          model: msg.model,
+          contextWindow: msg.contextWindow,
+          effort: msg.effort,
+          multiAgentVersion: msg.multiAgentVersion,
+        });
       }
     };
     const unsubscribe = transport.onMessage(handler);
@@ -581,5 +612,8 @@ export function useExtensionMessages(
     hooksEnabled,
     setHooksEnabled,
     hooksInfoShown,
+    sessions,
+    openedSession,
+    sessionError,
   };
 }

@@ -201,8 +201,9 @@ export function ToolOverlay({
         const isTeamAgent = !!ch.teamName;
         const teamRoleLabel = ch.isTeamLead ? 'LEAD' : ch.agentName || null;
         const totalTokens = ch.inputTokens + ch.outputTokens;
-        const tokenRatio = totalTokens / MAX_CONTEXT_TOKENS;
-        const hasExtraLines = !!(ch.folderName || teamRoleLabel);
+        const contextWindow = ch.contextWindow ?? MAX_CONTEXT_TOKENS;
+        const tokenRatio = totalTokens / contextWindow;
+        const hasExtraLines = !!(ch.folderName || teamRoleLabel || ch.model);
 
         return (
           <div
@@ -252,6 +253,13 @@ export function ToolOverlay({
                     {ch.folderName}
                   </span>
                 )}
+                {isSelected && ch.model && (
+                  <span className="text-2xs leading-none text-text-muted">
+                    {ch.model}
+                    {ch.effort ? ` · ${ch.effort}` : ''}
+                    {ch.multiAgentVersion ? ` · ${ch.multiAgentVersion}` : ''}
+                  </span>
+                )}
               </div>
               {isSelected && !isSub && (
                 <Button
@@ -276,7 +284,7 @@ export function ToolOverlay({
                   background: FUEL_GAUGE_BG,
                   marginTop: 2,
                 }}
-                title={`${Math.round(tokenRatio * 100)}% context used (${(totalTokens / 1000).toFixed(0)}k tokens)`}
+                title={`${Math.round(tokenRatio * 100)}% context used (${(totalTokens / 1000).toFixed(0)}k / ${(contextWindow / 1000).toFixed(0)}k tokens)`}
               >
                 <div
                   style={{

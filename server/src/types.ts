@@ -50,6 +50,10 @@ export interface AgentState {
   // -- Token tracking --
   inputTokens: number;
   outputTokens: number;
+  model?: string;
+  contextWindow?: number;
+  effort?: string;
+  multiAgentVersion?: string;
 
   // -- Agent Teams --
   teamName?: string;

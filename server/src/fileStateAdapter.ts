@@ -8,7 +8,7 @@
  *   ~/.pixel-agents/<namespace>-state.json
  *
  * Runtime visibility (which agents show in the office) is scope-controlled by the
- * runtime scanner + Watch All Sessions toggle, not by persistence. Both adapters
+ * runtime scanner for the session explicitly selected by the user, not by persistence. Both adapters
  * can observe the same ~/.claude/projects/ filesystem; each keeps its own local
  * agent IDs and seat mappings.
  */
@@ -44,7 +44,7 @@ export interface FileStateAdapterOptions {
 
 export class FileStateAdapter implements StateAdapter {
   private readonly namespace: ConfigNamespace;
-  private readonly stateFilePath: string;
+  private stateFilePath: string;
 
   constructor(options: FileStateAdapterOptions) {
     this.namespace = options.namespace;
@@ -53,6 +53,12 @@ export class FileStateAdapter implements StateAdapter {
       LAYOUT_FILE_DIR,
       `${options.namespace}-state.json`,
     );
+  }
+
+  setSessionScope(sessionId: string | null): void {
+    this.stateFilePath = sessionId
+      ? path.join(os.homedir(), LAYOUT_FILE_DIR, 'codex-worlds', sessionId, 'state.json')
+      : path.join(os.homedir(), LAYOUT_FILE_DIR, `${this.namespace}-state.json`);
   }
 
   // ── Settings (shared config.json, per-namespace section) ────

@@ -812,6 +812,8 @@ export function adoptExternalSessionFromHook(
 
   persistAgents: () => void,
   onAgentCreated?: (agent: AgentState) => void,
+  replayFromStart = false,
+  replayTailBytes = 0,
 ): void {
   if (transcriptPath) {
     // File-based provider (Claude, Codex): adopt with JSONL file watching
@@ -839,6 +841,8 @@ export function adoptExternalSessionFromHook(
       permissionTimers,
       persistAgents,
       folderName,
+      replayFromStart,
+      replayTailBytes,
     );
 
     const adoptedAgent = [...agents.values()].find((a) => a.jsonlFile === transcriptPath);
@@ -906,6 +910,8 @@ function adoptExternalSession(
 
   persistAgents: () => void,
   folderName?: string,
+  replayFromStart = false,
+  replayTailBytes = 0,
 ): void {
   const id = nextAgentIdRef.current++;
   // Decide whether to replay the existing file content or skip to its end.
@@ -933,7 +939,13 @@ function adoptExternalSession(
     const stat = fs.statSync(jsonlFile);
     const ageMs = stat.birthtimeMs > 0 ? Date.now() - stat.birthtimeMs : Number.POSITIVE_INFINITY;
     const freshnessWindowMs = EXTERNAL_SCAN_INTERVAL_MS * 2;
-    fileOffset = ageMs <= freshnessWindowMs ? 0 : stat.size;
+    if (replayFromStart || ageMs <= freshnessWindowMs) {
+      fileOffset = 0;
+    } else if (replayTailBytes > 0) {
+      fileOffset = findReplayTailOffset(jsonlFile, stat.size, replayTailBytes);
+    } else {
+      fileOffset = stat.size;
+    }
   } catch {
     /* start from beginning if stat fails */
   }
@@ -980,6 +992,27 @@ function adoptExternalSession(
     permissionTimers,
   );
   readNewLines(id, agents, waitingTimers, permissionTimers);
+}
+
+export function findReplayTailOffset(
+  filePath: string,
+  fileSize: number,
+  tailBytes: number,
+): number {
+  const start = Math.max(0, fileSize - tailBytes);
+  if (start === 0) return 0;
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const buffer = Buffer.alloc(Math.min(64 * 1024, fileSize - start));
+    const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, start);
+    const newline = buffer.subarray(0, bytesRead).indexOf(10);
+    return newline === -1 ? fileSize : start + newline + 1;
+  } catch {
+    return fileSize;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
 }
 
 /**

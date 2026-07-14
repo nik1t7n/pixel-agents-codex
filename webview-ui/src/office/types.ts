@@ -147,6 +147,7 @@ export interface Character {
   moveProgress: number;
   /** Current tool name for typing vs reading animation, or null */
   currentTool: string | null;
+  activityKind?: AgentActivityKind;
   /** Palette index (0-5) */
   palette: number;
   /** Hue shift in degrees (0 = no shift, ≥45 for repeated palettes) */
@@ -204,7 +205,20 @@ export interface Character {
   inputTokens: number;
   /** Cumulative output tokens consumed */
   outputTokens: number;
+  model?: string;
+  contextWindow?: number;
+  effort?: string;
+  multiAgentVersion?: string;
 }
+
+export type AgentActivityKind =
+  | 'reading'
+  | 'coding'
+  | 'testing'
+  | 'browser'
+  | 'communication'
+  | 'compacting'
+  | 'working';
 
 export const PetState = { IDLE: 'idle', WALK: 'walk', FOLLOW: 'follow' } as const;
 export type PetState = (typeof PetState)[keyof typeof PetState];

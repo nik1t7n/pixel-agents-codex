@@ -21,9 +21,31 @@ export function toMajorMinor(version: string): string {
   return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : version;
 }
 
-export const CHANGELOG_REPO_URL = 'https://github.com/pixel-agents-hq/pixel-agents';
+export const CHANGELOG_REPO_URL = 'https://github.com/nik1t7n/pixel-agents-codex';
 
 export const changelogEntries: ChangelogEntry[] = [
+  {
+    version: '0.1',
+    sections: [
+      {
+        title: 'Codex-native world',
+        items: [
+          'Choose and search real Codex Desktop sessions before creating a world',
+          'Persistent world, layout, and seats for each selected session',
+          'Real root and subagent characters from Codex parent-thread relationships',
+          'Live Hooks, bounded transcript replay, model metadata, and context usage',
+          'Pixel activity signs for reading, coding, tests, browser work, communication, and compaction',
+        ],
+      },
+    ],
+    contributors: [
+      {
+        name: 'Pixel Agents contributors',
+        url: 'https://github.com/pixel-agents-hq/pixel-agents',
+        description: 'Original game renderer, sprites, editor, assets, and runtime foundation',
+      },
+    ],
+  },
   {
     version: '1.3',
     sections: [

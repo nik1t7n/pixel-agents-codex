@@ -14,12 +14,14 @@ export interface LayoutWatcher {
   dispose(): void;
 }
 
-function getLayoutFilePath(): string {
-  return path.join(os.homedir(), LAYOUT_FILE_DIR, LAYOUT_FILE_NAME);
+function getLayoutFilePath(scope?: string): string {
+  return scope
+    ? path.join(os.homedir(), LAYOUT_FILE_DIR, 'codex-worlds', scope, LAYOUT_FILE_NAME)
+    : path.join(os.homedir(), LAYOUT_FILE_DIR, LAYOUT_FILE_NAME);
 }
 
-export function readLayoutFromFile(): Record<string, unknown> | null {
-  const filePath = getLayoutFilePath();
+export function readLayoutFromFile(scope?: string): Record<string, unknown> | null {
+  const filePath = getLayoutFilePath(scope);
   try {
     if (!fs.existsSync(filePath)) return null;
     const raw = fs.readFileSync(filePath, 'utf-8');
@@ -30,8 +32,8 @@ export function readLayoutFromFile(): Record<string, unknown> | null {
   }
 }
 
-export function writeLayoutToFile(layout: Record<string, unknown>): void {
-  const filePath = getLayoutFilePath();
+export function writeLayoutToFile(layout: Record<string, unknown>, scope?: string): void {
+  const filePath = getLayoutFilePath(scope);
   const dir = path.dirname(filePath);
   try {
     if (!fs.existsSync(dir)) {

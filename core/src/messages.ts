@@ -9,6 +9,9 @@
 
 export type ServerMessage =
   | ProviderCapabilities
+  | SessionCatalog
+  | SessionOpened
+  | SessionOpenFailed
   | AgentCreated
   | AgentClosed
   | AgentSelected
@@ -38,6 +41,9 @@ export type ServerMessage =
 
 export type ClientMessage =
   | WebviewReady
+  | OpenSession
+  | CloseSession
+  | RefreshSessionCatalog
   | LaunchAgent
   | FocusAgent
   | CloseAgent
@@ -60,6 +66,38 @@ export interface ProviderCapabilities {
   type: 'providerCapabilities';
   readingTools: string[];
   subagentToolNames: string[];
+}
+
+export interface SessionCatalog {
+  type: 'sessionCatalog';
+  sessions: CodexSessionSummary[];
+  selectedSession?: OpenedCodexSession;
+}
+
+export interface CodexSessionSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
+export interface OpenedCodexSession {
+  id: string;
+  title: string;
+  updatedAt: string;
+  cwd?: string;
+  originator?: string;
+}
+
+export interface SessionOpened {
+  type: 'sessionOpened';
+  session: OpenedCodexSession;
+  agentId: number;
+}
+
+export interface SessionOpenFailed {
+  type: 'sessionOpenFailed';
+  sessionId: string;
+  message: string;
 }
 
 export interface AgentCreated {
@@ -168,6 +206,7 @@ export interface AgentTeamInfo {
   isTeamLead?: boolean;
   leadAgentId?: number;
   teamUsesTmux?: boolean;
+  folderName?: string;
 }
 
 export interface AgentTokenUsage {
@@ -175,6 +214,10 @@ export interface AgentTokenUsage {
   id: number;
   inputTokens: number;
   outputTokens: number;
+  model?: string;
+  contextWindow?: number;
+  effort?: string;
+  multiAgentVersion?: string;
 }
 
 export interface LayoutLoaded {
@@ -281,6 +324,19 @@ export interface AgentDiagnostics {
 
 export interface WebviewReady {
   type: 'webviewReady';
+}
+
+export interface OpenSession {
+  type: 'openSession';
+  sessionId: string;
+}
+
+export interface CloseSession {
+  type: 'closeSession';
+}
+
+export interface RefreshSessionCatalog {
+  type: 'refreshSessionCatalog';
 }
 
 export interface LaunchAgent {

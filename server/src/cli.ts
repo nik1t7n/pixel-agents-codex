@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Standalone CLI entry point: `npx pixel-agents`
+ * Standalone CLI entry point: `npx pixel-agents-codex`
  *
  * Starts the Fastify server in standalone mode with SPA serving and WebSocket.
  * Loads all assets (PNGs -> SpriteData) on startup and caches in memory.
@@ -21,8 +21,9 @@ import {
   loadWallTiles,
 } from './assetLoader.js';
 import type { AssetCache } from './clientMessageHandler.js';
+import { CodexSessionController } from './codexSessionController.js';
 import { FileStateAdapter } from './fileStateAdapter.js';
-import { claudeProvider, copyHookScript } from './providers/index.js';
+import { codexProvider, copyCodexHookScript } from './providers/index.js';
 import { PixelAgentsServer } from './server.js';
 
 // ── Argument parsing ──────────────────────────────────────────
@@ -42,7 +43,7 @@ function parseArgs(argv: string[]): CliArgs {
       args.host = argv[i + 1];
       i++;
     } else if (argv[i] === '--help') {
-      console.log(`Usage: pixel-agents [options]
+      console.log(`Usage: pixel-agents-codex [options]
 
 Options:
   --port, -p <number>   Port to listen on (default: 3100)
@@ -90,7 +91,8 @@ async function main(): Promise<void> {
 
   try {
     // Create runtime first (before server.start, so we can pass it in)
-    const runtime = new AgentRuntime(store, claudeProvider);
+    const runtime = new AgentRuntime(store, codexProvider);
+    const sessionController = new CodexSessionController(runtime, store);
 
     // Wire hook events: HTTP POST -> runtime -> hookEventHandler -> agents
     server.onHookEvent((providerId, event) => {
@@ -103,15 +105,15 @@ async function main(): Promise<void> {
     const onSetHooksEnabled = async (enabled: boolean): Promise<void> => {
       if (!currentConfig) return;
       if (enabled) {
-        await claudeProvider.installHooks(
+        await codexProvider.installHooks(
           `http://127.0.0.1:${currentConfig.port}`,
           currentConfig.token,
         );
-        copyHookScript(distRoot);
-        console.log('[Pixel Agents] Hooks installed (user toggle)');
+        copyCodexHookScript(distRoot);
+        console.log('[Pixel Agents] Codex hooks installed (user toggle)');
       } else {
-        await claudeProvider.uninstallHooks();
-        console.log('[Pixel Agents] Hooks uninstalled (user toggle)');
+        await codexProvider.uninstallHooks();
+        console.log('[Pixel Agents] Codex hooks uninstalled (user toggle)');
       }
     };
 
@@ -124,6 +126,7 @@ async function main(): Promise<void> {
       staticDir,
       assetCache,
       onSetHooksEnabled,
+      sessionController,
     });
     currentConfig = { port: config.port, token: config.token };
 
@@ -134,26 +137,15 @@ async function main(): Promise<void> {
     // Install hooks on startup if the persisted setting says so
     if (runtime.hooksEnabled.current) {
       try {
-        await claudeProvider.installHooks(`http://127.0.0.1:${config.port}`, config.token);
-        copyHookScript(distRoot);
-        console.log('[Pixel Agents] Hooks installed');
+        await codexProvider.installHooks(`http://127.0.0.1:${config.port}`, config.token);
+        copyCodexHookScript(distRoot);
+        console.log('[Pixel Agents] Codex hooks installed');
       } catch (err) {
         console.error('[Pixel Agents] Failed to install hooks:', err);
       }
     }
 
-    // Start scanning for external sessions (Claude running in user's terminal)
-    const cwd = process.cwd();
-    const dirs = claudeProvider.getSessionDirs?.(cwd);
-    if (dirs && dirs[0]) {
-      const projectDir = dirs[0];
-      console.log(`[Pixel Agents] Scanning project dir: ${projectDir}`);
-      runtime.startProjectScan(projectDir);
-      runtime.startExternalScanning(projectDir);
-      runtime.startStaleCheck();
-    }
-
-    console.log(`\n  Pixel Agents server running at http://${args.host}:${config.port}\n`);
+    console.log(`\n  Pixel Codex Agents running at http://${args.host}:${config.port}\n`);
 
     // ── Graceful shutdown ──
     function shutdown(): void {

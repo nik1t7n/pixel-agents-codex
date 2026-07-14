@@ -133,6 +133,16 @@ export const AUTO_ON_SIDE_DEPTH = 2;
 export const CHARACTER_HIT_HALF_WIDTH = 8;
 export const CHARACTER_HIT_HEIGHT = 24;
 export const TOOL_OVERLAY_VERTICAL_OFFSET = 32;
+export const ACTIVITY_BADGE_BG = '#171923';
+export const ACTIVITY_BADGE_COLORS = {
+  reading: '#f2c94c',
+  coding: '#56ccf2',
+  testing: '#6fcf97',
+  browser: '#bb6bd9',
+  communication: '#f2994a',
+  compacting: '#e0e0e0',
+  working: '#2f80ed',
+} as const;
 
 // ── Agent Teams ─────────────────────────────────────────────
 export const MAX_CONTEXT_TOKENS = 200_000;

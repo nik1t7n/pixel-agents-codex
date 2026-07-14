@@ -15,8 +15,6 @@ interface SettingsModalProps {
   alwaysShowOverlay: boolean;
   onToggleAlwaysShowOverlay: () => void;
   externalAssetDirectories: string[];
-  watchAllSessions: boolean;
-  onToggleWatchAllSessions: () => void;
   hooksEnabled: boolean;
   onToggleHooksEnabled: () => void;
 }
@@ -29,8 +27,6 @@ export function SettingsModal({
   alwaysShowOverlay,
   onToggleAlwaysShowOverlay,
   externalAssetDirectories,
-  watchAllSessions,
-  onToggleWatchAllSessions,
   hooksEnabled,
   onToggleHooksEnabled,
 }: SettingsModalProps) {
@@ -98,16 +94,7 @@ export function SettingsModal({
           transport.send({ type: 'setSoundEnabled', enabled: newVal });
         }}
       />
-      <Checkbox
-        label="Watch All Sessions"
-        checked={watchAllSessions}
-        onChange={onToggleWatchAllSessions}
-      />
-      <Checkbox
-        label="Instant Detection (Hooks)"
-        checked={hooksEnabled}
-        onChange={onToggleHooksEnabled}
-      />
+      <Checkbox label="Live Codex Events" checked={hooksEnabled} onChange={onToggleHooksEnabled} />
       <Checkbox
         label="Always Show Labels"
         checked={alwaysShowOverlay}

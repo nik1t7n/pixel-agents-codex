@@ -26,6 +26,7 @@ import {
 import { findPath, getWalkableTiles, isWalkable } from '../layout/tileMap.js';
 import { getPetCount, getPetName } from '../sprites/petSpriteData.js';
 import { getLoadedCharacterCount } from '../sprites/spriteData.js';
+import { agentActivityKind } from '../toolUtils.js';
 import type {
   Character,
   FurnitureInstance,
@@ -697,10 +698,11 @@ export class OfficeState {
     this.furniture = layoutToFurnitureInstances(modifiedFurniture);
   }
 
-  setAgentTool(id: number, tool: string | null): void {
+  setAgentTool(id: number, tool: string | null, status = ''): void {
     const ch = this.characters.get(id);
     if (ch) {
       ch.currentTool = tool;
+      ch.activityKind = tool ? agentActivityKind(tool, status) : undefined;
     }
   }
 
@@ -873,6 +875,7 @@ export class OfficeState {
     isTeamLead?: boolean,
     leadAgentId?: number,
     teamUsesTmux?: boolean,
+    folderName?: string,
   ): void {
     const ch = this.characters.get(id);
     if (!ch) return;
@@ -883,13 +886,28 @@ export class OfficeState {
     if (teamUsesTmux !== undefined) {
       ch.teamUsesTmux = teamUsesTmux;
     }
+    if (folderName) ch.folderName = folderName;
   }
 
-  setAgentTokens(id: number, inputTokens: number, outputTokens: number): void {
+  setAgentTokens(
+    id: number,
+    inputTokens: number,
+    outputTokens: number,
+    metadata?: {
+      model?: string;
+      contextWindow?: number;
+      effort?: string;
+      multiAgentVersion?: string;
+    },
+  ): void {
     const ch = this.characters.get(id);
     if (!ch) return;
     ch.inputTokens = inputTokens;
     ch.outputTokens = outputTokens;
+    if (metadata?.model) ch.model = metadata.model;
+    if (metadata?.contextWindow) ch.contextWindow = metadata.contextWindow;
+    if (metadata?.effort) ch.effort = metadata.effort;
+    if (metadata?.multiAgentVersion) ch.multiAgentVersion = metadata.multiAgentVersion;
   }
 
   update(dt: number): void {

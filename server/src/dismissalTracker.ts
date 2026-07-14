@@ -58,6 +58,11 @@ export class DismissalTracker {
     return this.permanent.has(path);
   }
 
+  /** Allow an explicitly selected session to be opened again. */
+  clearPermanentDismissal(path: string): void {
+    this.permanent.delete(path);
+  }
+
   // ── Seeded mtimes (startup snapshot for --resume detection) ─────────
 
   seedMtime(path: string, mtime: number): void {

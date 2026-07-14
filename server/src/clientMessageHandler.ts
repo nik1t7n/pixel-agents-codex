@@ -1,6 +1,7 @@
 import type { AgentRuntime } from './agentRuntime.js';
 import type { AgentStateStore } from './agentStateStore.js';
 import type { LoadedAssets, LoadedCharacterSprites, LoadedPetSprites } from './assetLoader.js';
+import type { CodexSessionController } from './codexSessionController.js';
 import { readConfig, writeConfig } from './configPersistence.js';
 import { readLayoutFromFile, writeLayoutToFile } from './layoutPersistence.js';
 import { claudeProvider } from './providers/index.js';
@@ -26,6 +27,7 @@ export interface ClientMessageContext {
   cache: AssetCache | null;
   /** Install/uninstall hooks side effect. Needs server url+token known only to cli.ts. */
   onSetHooksEnabled?: SetHooksEnabledSideEffect;
+  sessionController?: CodexSessionController;
 }
 
 // ── Setting key constants (mirror adapters/vscode/constants.ts) ──
@@ -56,9 +58,39 @@ export function handleClientMessage(
       handleWebviewReady(send, ctx);
       break;
 
+    case 'openSession': {
+      const sessionId = typeof msg.sessionId === 'string' ? msg.sessionId : '';
+      if (!ctx.sessionController || !sessionId) break;
+      try {
+        const opened = ctx.sessionController.open(sessionId);
+        const layout = readLayoutFromFile(sessionId) ?? ctx.cache?.defaultLayout ?? null;
+        send({ type: 'layoutLoaded', layout });
+        send({ type: 'sessionOpened', ...opened });
+      } catch (error) {
+        send({
+          type: 'sessionOpenFailed',
+          sessionId,
+          message: error instanceof Error ? error.message : 'Codex session could not be opened',
+        });
+      }
+      break;
+    }
+
+    case 'closeSession':
+      ctx.sessionController?.close();
+      sendSessionCatalog(send, ctx.sessionController);
+      break;
+
+    case 'refreshSessionCatalog':
+      sendSessionCatalog(send, ctx.sessionController);
+      break;
+
     case 'saveLayout':
       if (msg.layout) {
-        writeLayoutToFile(msg.layout as Record<string, unknown>);
+        writeLayoutToFile(
+          msg.layout as Record<string, unknown>,
+          ctx.sessionController?.selectedSession()?.id,
+        );
       }
       break;
 
@@ -137,9 +169,11 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   // 1. Provider capabilities (must arrive before any agent messages)
   send({
     type: 'providerCapabilities',
-    readingTools: [...claudeProvider.readingTools],
-    subagentToolNames: [...claudeProvider.subagentToolNames],
+    readingTools: [...(runtime?.provider ?? claudeProvider).readingTools],
+    subagentToolNames: [...(runtime?.provider ?? claudeProvider).subagentToolNames],
   });
+
+  sendSessionCatalog(send, ctx.sessionController);
 
   // 2. Assets (from server cache, loaded at startup via pngjs)
   if (cache) {
@@ -169,7 +203,8 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   }
 
   // 3. Layout (saved file, or bundled default)
-  const savedLayout = readLayoutFromFile();
+  const selectedSessionId = ctx.sessionController?.selectedSession()?.id;
+  const savedLayout = selectedSessionId ? readLayoutFromFile(selectedSessionId) : null;
   send({ type: 'layoutLoaded', layout: savedLayout ?? cache?.defaultLayout ?? null });
 
   // 4. Settings (from adapter, with sensible defaults when adapter is absent)
@@ -196,7 +231,7 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   }
 
   // 5. Restore persisted external agents (standalone only; VS Code handles its own restore)
-  runtime?.restoreExternalAgents();
+  if (!ctx.sessionController) runtime?.restoreExternalAgents();
 
   // 6. Existing agents (either just restored, or from VS Code adapter if present)
   const agentIds: number[] = [];
@@ -218,5 +253,14 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
     agentMeta: seats,
     folderNames,
     externalAgents,
+  });
+}
+
+function sendSessionCatalog(send: WsSend, controller: CodexSessionController | undefined): void {
+  if (!controller) return;
+  send({
+    type: 'sessionCatalog',
+    sessions: controller.listSessions(),
+    selectedSession: controller.selectedSession() ?? undefined,
   });
 }

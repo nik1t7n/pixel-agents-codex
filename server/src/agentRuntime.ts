@@ -32,10 +32,13 @@ import {
 } from './fileWatcher.js';
 import type { HookEvent } from './hookEventHandler.js';
 import { HookEventHandler } from './hookEventHandler.js';
+import { readCodexSessionMeta } from './providers/hook/codex/codexSessionCatalog.js';
 import { SessionRouter } from './sessionRouter.js';
 import { cancelPermissionTimer, cancelWaitingTimer } from './timerManager.js';
 import { setHookProvider } from './transcriptParser.js';
 import type { AgentState } from './types.js';
+
+const SELECTED_SESSION_REPLAY_BYTES = 128 * 1024;
 
 /** Callbacks that adapters register for platform-specific behavior. */
 export interface RuntimeLifecycleCallbacks {
@@ -68,10 +71,12 @@ export class AgentRuntime {
   readonly dismissalTracker = new DismissalTracker();
   private hookEventHandler: HookEventHandler;
   private lifecycleCallbacks: RuntimeLifecycleCallbacks = {};
+  private readonly selectedSessionIds = new Set<string>();
+  private selectedRootSessionId: string | null = null;
 
   constructor(
     private readonly store: AgentStateStore,
-    provider: HookProvider,
+    readonly provider: HookProvider,
   ) {
     // Wire module-level dependencies
     setDismissalTracker(this.dismissalTracker);
@@ -95,8 +100,19 @@ export class AgentRuntime {
     // Wire hook lifecycle callbacks to shared agent operations
     this.hookEventHandler.setLifecycleCallbacks({
       onExternalSessionDetected: (sessionId, transcriptPath, cwd) => {
+        const selectedParent =
+          transcriptPath && this.selectedRootSessionId
+            ? readCodexSessionMeta(transcriptPath)?.parentThreadId
+            : undefined;
+        if (this.selectedRootSessionId) {
+          if (!selectedParent || !this.selectedSessionIds.has(selectedParent)) return;
+        }
         const projectDir = transcriptPath ? path.dirname(transcriptPath) : cwd;
-        if (!isTrackedProjectDir(projectDir) && !this.watchAllSessions.current) {
+        if (
+          !this.selectedRootSessionId &&
+          !isTrackedProjectDir(projectDir) &&
+          !this.watchAllSessions.current
+        ) {
           return;
         }
         adoptExternalSessionFromHook(
@@ -111,7 +127,28 @@ export class AgentRuntime {
           this.waitingTimers,
           this.permissionTimers,
           () => this.store.persist(),
-          (agent) => this.registerAgent(agent.sessionId, agent.id),
+          (agent) => {
+            this.registerAgent(agent.sessionId, agent.id);
+            if (!this.selectedRootSessionId || !selectedParent) return;
+            const parent = [...this.store.values()].find(
+              (candidate) => candidate.sessionId === selectedParent,
+            );
+            agent.providerId = this.provider.id;
+            agent.leadAgentId = parent?.id;
+            agent.teamName = this.selectedRootSessionId;
+            agent.agentName = readCodexSessionMeta(agent.jsonlFile)?.nickname ?? 'subagent';
+            this.selectedSessionIds.add(sessionId);
+            this.store.broadcast({
+              type: 'agentTeamInfo',
+              id: agent.id,
+              teamName: agent.teamName,
+              agentName: agent.agentName,
+              isTeamLead: false,
+              leadAgentId: agent.leadAgentId,
+              folderName: cwd ? path.basename(cwd) : agent.folderName,
+            });
+            this.store.persist();
+          },
         );
       },
       onSessionClear: (agentId, newSessionId, newTranscriptPath) => {
@@ -198,6 +235,108 @@ export class AgentRuntime {
   /** Unregister an agent from the hook event handler. */
   unregisterAgent(sessionId: string): void {
     this.hookEventHandler.unregisterAgent(sessionId);
+  }
+
+  openSelectedSession(session: {
+    id: string;
+    transcriptPath: string;
+    cwd?: string;
+    children?: Array<{
+      id: string;
+      parentThreadId: string;
+      transcriptPath: string;
+      cwd?: string;
+      nickname?: string;
+      role?: string;
+    }>;
+  }): number | null {
+    this.closeSelectedSession();
+    this.selectedRootSessionId = session.id;
+    this.selectedSessionIds.add(session.id);
+    this.dismissalTracker.clearDismissal(session.transcriptPath);
+    this.dismissalTracker.clearPermanentDismissal(session.transcriptPath);
+
+    adoptExternalSessionFromHook(
+      session.id,
+      session.transcriptPath,
+      session.cwd ?? path.dirname(session.transcriptPath),
+      this.knownJsonlFiles,
+      this.store.nextAgentId,
+      this.store,
+      this.fileWatchers,
+      this.pollingTimers,
+      this.waitingTimers,
+      this.permissionTimers,
+      () => this.store.persist(),
+      (agent) => {
+        agent.providerId = this.provider.id;
+        agent.folderName = session.cwd ? path.basename(session.cwd) : agent.folderName;
+        this.registerAgent(session.id, agent.id);
+      },
+      false,
+      SELECTED_SESSION_REPLAY_BYTES,
+    );
+
+    const lead = [...this.store.values()].find((agent) => agent.sessionId === session.id);
+    if (!lead) return null;
+    lead.isTeamLead = true;
+    lead.teamName = session.id;
+    lead.agentName = 'executor';
+    this.store.broadcast({
+      type: 'agentTeamInfo',
+      id: lead.id,
+      teamName: lead.teamName,
+      agentName: lead.agentName,
+      isTeamLead: true,
+      folderName: session.cwd ? path.basename(session.cwd) : lead.folderName,
+    });
+
+    const agentIdsBySession = new Map<string, number>([[session.id, lead.id]]);
+    for (const child of session.children ?? []) {
+      this.dismissalTracker.clearDismissal(child.transcriptPath);
+      this.dismissalTracker.clearPermanentDismissal(child.transcriptPath);
+      adoptExternalSessionFromHook(
+        child.id,
+        child.transcriptPath,
+        child.cwd ?? path.dirname(child.transcriptPath),
+        this.knownJsonlFiles,
+        this.store.nextAgentId,
+        this.store,
+        this.fileWatchers,
+        this.pollingTimers,
+        this.waitingTimers,
+        this.permissionTimers,
+        () => this.store.persist(),
+        (agent) => {
+          agent.providerId = this.provider.id;
+          agent.leadAgentId = agentIdsBySession.get(child.parentThreadId) ?? lead.id;
+          agent.teamName = session.id;
+          agent.agentName = child.nickname ?? child.role ?? 'subagent';
+          agentIdsBySession.set(child.id, agent.id);
+          this.selectedSessionIds.add(child.id);
+          this.registerAgent(child.id, agent.id);
+          this.store.broadcast({
+            type: 'agentTeamInfo',
+            id: agent.id,
+            teamName: agent.teamName,
+            agentName: agent.agentName,
+            isTeamLead: false,
+            leadAgentId: agent.leadAgentId,
+            folderName: child.cwd ? path.basename(child.cwd) : agent.folderName,
+          });
+        },
+        false,
+        SELECTED_SESSION_REPLAY_BYTES,
+      );
+    }
+    this.store.persist();
+    return lead.id;
+  }
+
+  closeSelectedSession(): void {
+    for (const id of [...this.store.keys()]) this.removeAgent(id);
+    this.selectedSessionIds.clear();
+    this.selectedRootSessionId = null;
   }
 
   // ── Agent removal (shared cleanup) ──

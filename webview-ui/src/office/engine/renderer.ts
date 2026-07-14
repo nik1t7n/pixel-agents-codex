@@ -1,5 +1,7 @@
 import type { ColorValue } from '../../components/ui/types.js';
 import {
+  ACTIVITY_BADGE_BG,
+  ACTIVITY_BADGE_COLORS,
   BUBBLE_FADE_DURATION_SEC,
   BUBBLE_SITTING_OFFSET_PX,
   BUBBLE_VERTICAL_OFFSET_PX,
@@ -554,6 +556,88 @@ function renderBubbles(
   }
 }
 
+function renderActivityBadges(
+  ctx: CanvasRenderingContext2D,
+  characters: Character[],
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+): void {
+  for (const ch of characters) {
+    if (!ch.isActive || !ch.currentTool || !ch.activityKind) continue;
+    const x = Math.round(offsetX + (ch.x + 5) * zoom);
+    const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+    const y = Math.round(offsetY + (ch.y + sittingOffset - 22) * zoom);
+    ctx.fillStyle = ACTIVITY_BADGE_BG;
+    ctx.fillRect(x, y, 7 * zoom, 7 * zoom);
+    ctx.fillStyle = ACTIVITY_BADGE_COLORS[ch.activityKind];
+
+    const pixels: Array<[number, number]> =
+      ch.activityKind === 'testing'
+        ? [
+            [1, 3],
+            [2, 4],
+            [3, 3],
+            [4, 2],
+            [5, 1],
+          ]
+        : ch.activityKind === 'communication'
+          ? [
+              [1, 2],
+              [2, 2],
+              [4, 2],
+              [5, 2],
+              [2, 4],
+              [3, 4],
+              [4, 4],
+            ]
+          : ch.activityKind === 'compacting'
+            ? [
+                [2, 1],
+                [3, 1],
+                [4, 1],
+                [1, 3],
+                [2, 3],
+                [3, 3],
+                [4, 3],
+                [5, 3],
+                [2, 5],
+                [3, 5],
+                [4, 5],
+              ]
+            : ch.activityKind === 'browser'
+              ? [
+                  [2, 1],
+                  [3, 1],
+                  [4, 1],
+                  [1, 2],
+                  [5, 2],
+                  [1, 3],
+                  [3, 3],
+                  [5, 3],
+                  [1, 4],
+                  [5, 4],
+                  [2, 5],
+                  [3, 5],
+                  [4, 5],
+                ]
+              : [
+                  [1, 1],
+                  [1, 2],
+                  [1, 3],
+                  [1, 4],
+                  [1, 5],
+                  [3, 2],
+                  [4, 2],
+                  [5, 2],
+                  [3, 4],
+                  [4, 4],
+                  [5, 4],
+                ];
+    for (const [px, py] of pixels) ctx.fillRect(x + px * zoom, y + py * zoom, zoom, zoom);
+  }
+}
+
 function renderPetBubbles(
   ctx: CanvasRenderingContext2D,
   pets: Pet[],
@@ -699,6 +783,7 @@ export function renderFrame(
 
   // Speech bubbles (always on top of characters)
   renderBubbles(ctx, characters, offsetX, offsetY, zoom);
+  renderActivityBadges(ctx, characters, offsetX, offsetY, zoom);
   // Pet heart bubbles (same overlay pass)
   if (pets && pets.length > 0) {
     renderPetBubbles(ctx, pets, offsetX, offsetY, zoom);

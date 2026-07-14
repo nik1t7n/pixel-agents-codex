@@ -1,4 +1,5 @@
 import { ZOOM_DEFAULT_DPR_FACTOR, ZOOM_MIN } from '../constants.js';
+import type { AgentActivityKind } from './types.js';
 
 /** Map status prefixes back to tool names for animation selection */
 const STATUS_TO_TOOL: Record<string, string> = {
@@ -23,7 +24,7 @@ export function extractToolName(status: string): string | null {
 
 /** Compute a default integer zoom level (device pixels per sprite pixel) */
 export function defaultZoom(): number {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = (globalThis as { devicePixelRatio?: number }).devicePixelRatio || 1;
   return Math.max(ZOOM_MIN, Math.round(ZOOM_DEFAULT_DPR_FACTOR * dpr));
 }
 
@@ -54,4 +55,21 @@ export function isReadingToolName(name: string | null | undefined): boolean {
 
 export function isSubagentToolName(name: string | null | undefined): boolean {
   return typeof name === 'string' && providerCaps.subagentToolNames.has(name);
+}
+
+export function agentActivityKind(toolName: string | null, status = ''): AgentActivityKind {
+  if (isReadingToolName(toolName)) return 'reading';
+  if (toolName === 'ContextCompact') return 'compacting';
+  if (toolName === 'web__run' || toolName === 'view_image') return 'browser';
+  if (toolName === 'apply_patch' || toolName === 'write_stdin') return 'coding';
+  if (/\b(test|vitest|jest|pytest|playwright|lint|build)\b/i.test(status)) return 'testing';
+  if (
+    toolName?.includes('spawn_agent') ||
+    toolName?.includes('send_message') ||
+    toolName?.includes('followup_task') ||
+    toolName === 'wait_agent'
+  ) {
+    return 'communication';
+  }
+  return 'working';
 }

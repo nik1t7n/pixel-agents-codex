@@ -9,6 +9,7 @@ import type { AgentRuntime } from './agentRuntime.js';
 import type { AgentStateStore } from './agentStateStore.js';
 import type { AssetCache, SetHooksEnabledSideEffect } from './clientMessageHandler.js';
 import { handleClientMessage } from './clientMessageHandler.js';
+import type { CodexSessionController } from './codexSessionController.js';
 import { HOOK_API_PREFIX, MAX_HOOK_BODY_SIZE } from './constants.js';
 import type { AgentState } from './types.js';
 
@@ -34,6 +35,7 @@ export interface HttpServerOptions {
   onHookEvent?: (providerId: string, event: Record<string, unknown>) => void;
   /** Invoked when setHooksEnabled is toggled via WebSocket. Standalone installs/uninstalls hooks here. */
   onSetHooksEnabled?: SetHooksEnabledSideEffect;
+  sessionController?: CodexSessionController;
 }
 
 /** Result of createHttpServer(). */
@@ -188,6 +190,7 @@ function registerWebSocketRoute(app: FastifyInstance, options: HttpServerOptions
           runtime: options.runtime,
           cache: options.assetCache ?? null,
           onSetHooksEnabled: options.onSetHooksEnabled,
+          sessionController: options.sessionController,
         });
       } catch {
         // Malformed JSON, ignore

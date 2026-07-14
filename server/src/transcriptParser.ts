@@ -1,6 +1,6 @@
 const debug = process.env.PIXEL_AGENTS_DEBUG !== '0';
 
-import type { HookProvider } from '../../core/src/provider.js';
+import type { AgentEvent, HookProvider } from '../../core/src/provider.js';
 import type { AgentStateStore } from './agentStateStore.js';
 import { TEXT_IDLE_DELAY_MS, TOOL_DONE_DELAY_MS } from './constants.js';
 import { hasInlineTeammates } from './teamUtils.js';
@@ -54,6 +54,17 @@ export function processTranscriptLine(
   agent.lastDataAt = Date.now();
   agent.linesProcessed++;
   try {
+    const providerEvent = hookProvider?.parseTranscriptLine?.(line);
+    if (providerEvent) {
+      processProviderTranscriptEvent(
+        agentId,
+        providerEvent,
+        agents,
+        waitingTimers,
+        permissionTimers,
+      );
+      return;
+    }
     const record = JSON.parse(line);
 
     // -- Agent Teams: extract team metadata via the active provider --
@@ -398,6 +409,92 @@ export function processTranscriptLine(
   } catch {
     // Ignore malformed lines
   }
+}
+
+function processProviderTranscriptEvent(
+  agentId: number,
+  event: AgentEvent,
+  agents: AgentStateStore,
+  waitingTimers: Map<number, ReturnType<typeof setTimeout>>,
+  permissionTimers: Map<number, ReturnType<typeof setTimeout>>,
+): void {
+  const agent = agents.get(agentId);
+  if (!agent) return;
+
+  switch (event.kind) {
+    case 'toolStart': {
+      cancelWaitingTimer(agentId, waitingTimers);
+      agent.isWaiting = false;
+      agent.hadToolsInTurn = true;
+      agent.activeToolIds.add(event.toolId);
+      agent.activeToolNames.set(event.toolId, event.toolName);
+      const status = formatToolStatus(event.toolName, objectRecord(event.input));
+      agent.activeToolStatuses.set(event.toolId, status);
+      agents.broadcast({ type: 'agentStatus', id: agentId, status: 'active' });
+      agents.broadcast({
+        type: 'agentToolStart',
+        id: agentId,
+        toolId: event.toolId,
+        status,
+        toolName: event.toolName,
+      });
+      break;
+    }
+    case 'toolEnd': {
+      agent.activeToolIds.delete(event.toolId);
+      agent.activeToolStatuses.delete(event.toolId);
+      agent.activeToolNames.delete(event.toolId);
+      agents.broadcast({ type: 'agentToolDone', id: agentId, toolId: event.toolId });
+      break;
+    }
+    case 'turnEnd': {
+      cancelPermissionTimer(agentId, permissionTimers);
+      agent.isWaiting = true;
+      agent.hadToolsInTurn = false;
+      agents.broadcast({
+        type: 'agentStatus',
+        id: agentId,
+        status: 'waiting',
+        awaitingInput: event.awaitingInput,
+      });
+      break;
+    }
+    case 'progress': {
+      const data = objectRecord(event.data);
+      if (data.type === 'tokenUsage') {
+        if (typeof data.inputTokens === 'number') agent.inputTokens = data.inputTokens;
+        if (typeof data.outputTokens === 'number') agent.outputTokens = data.outputTokens;
+      } else if (data.type !== 'agentMetadata') {
+        break;
+      }
+      if (typeof data.model === 'string') agent.model = data.model;
+      if (typeof data.contextWindow === 'number') agent.contextWindow = data.contextWindow;
+      if (typeof data.effort === 'string') agent.effort = data.effort;
+      if (typeof data.multiAgentVersion === 'string') {
+        agent.multiAgentVersion = data.multiAgentVersion;
+      }
+      agents.broadcast({
+        type: 'agentTokenUsage',
+        id: agentId,
+        inputTokens: agent.inputTokens,
+        outputTokens: agent.outputTokens,
+        model: agent.model,
+        contextWindow: agent.contextWindow,
+        effort: agent.effort,
+        multiAgentVersion: agent.multiAgentVersion,
+      });
+      break;
+    }
+    case 'sessionStart':
+      if (event.cwd) agent.projectDir = event.cwd;
+      break;
+    default:
+      break;
+  }
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
 }
 
 function processProgressRecord(

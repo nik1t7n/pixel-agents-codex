@@ -6,6 +6,7 @@ import { ChangelogModal } from './components/ChangelogModal.js';
 import { DebugView } from './components/DebugView.js';
 import { EditActionBar } from './components/EditActionBar.js';
 import { MigrationNotice } from './components/MigrationNotice.js';
+import { SessionPicker } from './components/SessionPicker.js';
 import { SettingsModal } from './components/SettingsModal.js';
 import { Tooltip } from './components/Tooltip.js';
 import { Modal } from './components/ui/Modal.js';
@@ -75,13 +76,19 @@ function App() {
     externalAssetDirectories,
     lastSeenVersion,
     extensionVersion,
-    watchAllSessions,
-    setWatchAllSessions,
     alwaysShowLabels,
     hooksEnabled,
     setHooksEnabled,
     hooksInfoShown,
+    sessions,
+    openedSession,
+    sessionError,
   } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty);
+
+  const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
+  useEffect(() => {
+    if (openedSession || sessionError) setOpeningSessionId(null);
+  }, [openedSession, sessionError]);
 
   // Show migration notice once layout reset is detected
   const [migrationNoticeDismissed, setMigrationNoticeDismissed] = useState(false);
@@ -178,6 +185,21 @@ function App() {
     return <div className="w-full h-full flex items-center justify-center ">Loading...</div>;
   }
 
+  if (!openedSession) {
+    return (
+      <SessionPicker
+        sessions={sessions}
+        openingSessionId={openingSessionId}
+        error={sessionError}
+        onOpen={(sessionId) => {
+          setOpeningSessionId(sessionId);
+          transport.send({ type: 'openSession', sessionId });
+        }}
+        onRefresh={() => transport.send({ type: 'refreshSessionCatalog' })}
+      />
+    );
+  }
+
   return (
     <div ref={containerRef} className="w-full h-full relative overflow-hidden">
       <OfficeCanvas
@@ -196,6 +218,16 @@ function App() {
         onZoomChange={editor.handleZoomChange}
         panRef={editor.panRef}
       />
+
+      {!editor.isEditMode && (
+        <button
+          type="button"
+          onClick={() => transport.send({ type: 'closeSession' })}
+          className="absolute left-10 top-10 z-20 cursor-pointer border-2 border-border bg-bg px-12 py-6 text-sm text-text shadow-pixel hover:bg-btn-hover"
+        >
+          Sessions
+        </button>
+      )}
 
       {!isDebugMode ? (
         <>
@@ -309,15 +341,15 @@ function App() {
         zIndex={52}
       >
         <div className="text-base text-text px-10" style={{ lineHeight: 1.4 }}>
-          <p className="mb-8">Your Pixel Agents office now reacts in real-time:</p>
+          <p className="mb-8">Your selected Codex session now reacts in real-time:</p>
           <ul className="mb-8 pl-18 list-disc m-0">
-            <li className="text-sm mb-2">Permission prompts appear instantly</li>
+            <li className="text-sm mb-2">Agents appear when Codex starts them</li>
             <li className="text-sm mb-2">Turn completions detected the moment they happen</li>
-            <li className="text-sm mb-2">Sound notifications play immediately</li>
+            <li className="text-sm mb-2">Tool activity updates each character immediately</li>
           </ul>
           <p className="mb-12 text-text-muted">
-            This works through Claude Code Hooks, small event listeners that notify Pixel Agents
-            whenever something happens in your Claude sessions.
+            This works through Codex Hooks, small event listeners that notify Pixel Codex Agents
+            whenever something happens in the selected session.
           </p>
           <div className="text-center">
             <button
@@ -328,7 +360,7 @@ function App() {
             </button>
           </div>
           <p className="mt-8 text-xs text-text-muted text-center">
-            To disable, go to Settings {'>'} Instant Detection
+            To disable, go to Settings {'>'} Live Codex Events
           </p>
         </div>
       </Modal>
@@ -363,12 +395,6 @@ function App() {
         alwaysShowOverlay={alwaysShowOverlay}
         onToggleAlwaysShowOverlay={handleToggleAlwaysShowOverlay}
         externalAssetDirectories={externalAssetDirectories}
-        watchAllSessions={watchAllSessions}
-        onToggleWatchAllSessions={() => {
-          const newVal = !watchAllSessions;
-          setWatchAllSessions(newVal);
-          transport.send({ type: 'setWatchAllSessions', enabled: newVal });
-        }}
         hooksEnabled={hooksEnabled}
         onToggleHooksEnabled={() => {
           const newVal = !hooksEnabled;

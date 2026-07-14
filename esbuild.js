@@ -39,7 +39,7 @@ function copyAssets() {
  * Produces a self-contained CJS file with shebang for Claude Code to execute.
  */
 function buildHooks() {
-  const entry = path.join(
+  const claudeEntry = path.join(
     __dirname,
     'server',
     'src',
@@ -49,14 +49,32 @@ function buildHooks() {
     'hooks',
     'claude-hook.ts',
   );
-  if (!fs.existsSync(entry)) return;
+  const codexEntry = path.join(
+    __dirname,
+    'server',
+    'src',
+    'providers',
+    'hook',
+    'codex',
+    'hooks',
+    'codex-hook.ts',
+  );
+  const entryPoints = Object.fromEntries(
+    [
+      ['claude-hook', claudeEntry],
+      ['codex-hook', codexEntry],
+    ].filter(([, entry]) => fs.existsSync(entry)),
+  );
+  if (Object.keys(entryPoints).length === 0) return;
+  const outdir = path.join(__dirname, 'dist', 'hooks');
+  fs.rmSync(outdir, { recursive: true, force: true });
   require('esbuild').buildSync({
-    entryPoints: [entry],
+    entryPoints,
     bundle: true,
     platform: 'node',
     target: 'node18',
     format: 'cjs',
-    outdir: path.join(__dirname, 'dist', 'hooks'),
+    outdir,
     banner: { js: '#!/usr/bin/env node' },
   });
   console.log('✓ Built hooks/ → dist/hooks/');
@@ -127,7 +145,7 @@ async function buildCli() {
     logLevel: 'silent',
   });
   if (!production) {
-    console.log('[build] CLI bundled: dist/cli.mjs');
+    console.log('[build] CLI bundled: dist/cli.js');
   }
 }
 
