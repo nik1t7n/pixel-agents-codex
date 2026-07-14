@@ -13,7 +13,7 @@ import {
   extractToolName,
   isSubagentToolName,
   setProviderCapabilities,
-  stableAgentPalette,
+  stableAgentAppearance,
 } from '../office/toolUtils.js';
 import type { OfficeLayout, ToolActivity } from '../office/types.js';
 import { setWallSprites } from '../office/wallTiles.js';
@@ -98,9 +98,9 @@ function saveAgentSeats(os: OfficeState): void {
   transport.send({ type: 'saveAgentSeats', seats });
 }
 
-function sessionPalette(sessionId: string | undefined): number | undefined {
-  if (!sessionId) return undefined;
-  return stableAgentPalette(sessionId, getLoadedCharacterCount());
+function sessionAppearance(sessionId: string | undefined): { palette?: number; hueShift?: number } {
+  if (!sessionId) return {};
+  return stableAgentAppearance(sessionId, getLoadedCharacterCount());
 }
 
 export function useExtensionMessages(
@@ -271,7 +271,7 @@ export function useExtensionMessages(
         }
       } else if (msg.type === 'agentCreated') {
         const id = msg.id as number;
-        const palette = sessionPalette(msg.sessionId as string | undefined);
+        const { palette, hueShift } = sessionAppearance(msg.sessionId as string | undefined);
         const folderName = msg.folderName as string | undefined;
         const isTeammate = msg.isTeammate as boolean | undefined;
         const teammateName = msg.teammateName as string | undefined;
@@ -281,7 +281,7 @@ export function useExtensionMessages(
           hiddenTeammates.set(id, {
             parentAgentId: teammateParentId,
             palette,
-            hueShift: 0,
+            hueShift,
             folderName,
             agentName: teammateName,
             teamName,
@@ -293,7 +293,7 @@ export function useExtensionMessages(
         if (!isTeammate) {
           setSelectedAgent(id);
         }
-        os.addAgent(id, palette, 0, undefined, undefined, folderName);
+        os.addAgent(id, palette, hueShift, undefined, undefined, folderName);
         saveAgentSeats(os);
       } else if (msg.type === 'agentClosed') {
         const id = msg.id as number;
@@ -339,10 +339,11 @@ export function useExtensionMessages(
           const m = meta[id];
           const parentAgentId = parentAgentIds[id];
           if (parentAgentId !== undefined) {
+            const appearance = sessionAppearance(sessionIds[id]);
             hiddenTeammates.set(id, {
               parentAgentId,
-              palette: sessionPalette(sessionIds[id]) ?? m?.palette,
-              hueShift: sessionIds[id] ? 0 : m?.hueShift,
+              palette: appearance.palette ?? m?.palette,
+              hueShift: appearance.hueShift ?? m?.hueShift,
               folderName: folderNames[id],
               agentName: agentNames[id],
             });
@@ -353,14 +354,27 @@ export function useExtensionMessages(
             }
             continue;
           }
-          pendingAgents.push({
+          const appearance = sessionAppearance(sessionIds[id]);
+          const pendingAgent = {
             id,
-            palette: sessionPalette(sessionIds[id]) ?? m?.palette,
-            hueShift: sessionIds[id] ? 0 : m?.hueShift,
+            palette: appearance.palette ?? m?.palette,
+            hueShift: appearance.hueShift ?? m?.hueShift,
             seatId: m?.seatId,
             folderName: folderNames[id],
             sessionId: sessionIds[id],
-          });
+          };
+          if (layoutReadyRef.current) {
+            os.addAgent(
+              pendingAgent.id,
+              pendingAgent.palette,
+              pendingAgent.hueShift,
+              pendingAgent.seatId,
+              true,
+              pendingAgent.folderName,
+            );
+          } else {
+            pendingAgents.push(pendingAgent);
+          }
         }
         setAgents((prev) => {
           const ids = new Set(prev);
@@ -373,6 +387,7 @@ export function useExtensionMessages(
           }
           return merged.sort((a, b) => a - b);
         });
+        if (layoutReadyRef.current && incoming.length > 0) saveAgentSeats(os);
       } else if (msg.type === 'agentToolStart') {
         const id = msg.id as number;
         const toolId = msg.toolId as string;
@@ -660,12 +675,18 @@ export function useExtensionMessages(
       } else if (msg.type === 'agentTeamInfo') {
         const id = msg.id as number;
         const leadAgentId = msg.leadAgentId as number | undefined;
+        const appearance = sessionAppearance(msg.sessionId as string | undefined);
+        const character = os.characters.get(id);
+        if (character && appearance.palette !== undefined) {
+          character.palette = appearance.palette;
+          character.hueShift = appearance.hueShift ?? character.hueShift;
+        }
         if (leadAgentId !== undefined) {
           const current = hiddenTeammates.get(id);
           hiddenTeammates.set(id, {
             parentAgentId: leadAgentId,
-            palette: current?.palette,
-            hueShift: current?.hueShift,
+            palette: appearance.palette ?? current?.palette,
+            hueShift: appearance.hueShift ?? current?.hueShift,
             folderName: (msg.folderName as string | undefined) ?? current?.folderName,
             agentName: (msg.agentName as string | undefined) ?? current?.agentName,
             teamName: (msg.teamName as string | undefined) ?? current?.teamName,
@@ -683,6 +704,13 @@ export function useExtensionMessages(
           msg.teamUsesTmux as boolean | undefined,
           msg.folderName as string | undefined,
         );
+      } else if (msg.type === 'agentThought') {
+        const id = msg.id as number;
+        const text = msg.text as string;
+        activeAgentIds.add(id);
+        showTeammate(id, os);
+        os.setAgentActive(id, true);
+        os.setAgentThought(id, text);
       } else if (msg.type === 'agentTokenUsage') {
         const id = msg.id as number;
         os.setAgentTokens(id, msg.inputTokens as number, msg.outputTokens as number, {

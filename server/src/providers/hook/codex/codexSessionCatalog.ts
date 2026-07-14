@@ -264,3 +264,41 @@ export function readCodexSessionMeta(filePath: string): {
     if (fd !== undefined) fs.closeSync(fd);
   }
 }
+
+/** True when the transcript's latest turn has started but has not finished. */
+export function isCodexSessionActive(filePath: string): boolean {
+  let fd: number | undefined;
+  try {
+    const stat = fs.statSync(filePath);
+    fd = fs.openSync(filePath, 'r');
+    let position = stat.size;
+    let leadingPartial = '';
+    while (position > 0) {
+      const bytes = Math.min(position, 256 * 1024);
+      position -= bytes;
+      const buffer = Buffer.alloc(bytes);
+      fs.readSync(fd, buffer, 0, bytes, position);
+      const lines = `${buffer.toString('utf-8')}${leadingPartial}`.split('\n');
+      leadingPartial = lines.shift() ?? '';
+      for (let index = lines.length - 1; index >= 0; index--) {
+        try {
+          const record = JSON.parse(lines[index]!) as {
+            type?: unknown;
+            payload?: { type?: unknown };
+          };
+          if (record.type !== 'event_msg') continue;
+          const type = record.payload?.type;
+          if (type === 'task_started') return true;
+          if (type === 'task_complete' || type === 'turn_aborted') return false;
+        } catch {
+          // The newest block can end in a partially written record.
+        }
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}

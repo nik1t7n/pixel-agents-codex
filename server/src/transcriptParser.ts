@@ -475,6 +475,12 @@ function processProviderTranscriptEvent(
     }
     case 'progress': {
       const data = objectRecord(event.data);
+      if (data.type === 'agentThought') {
+        if (typeof data.text === 'string' && data.text) {
+          agents.broadcast({ type: 'agentThought', id: agentId, text: data.text });
+        }
+        break;
+      }
       if (data.type === 'tokenUsage') {
         if (typeof data.inputTokens === 'number') agent.inputTokens = data.inputTokens;
         if (typeof data.outputTokens === 'number') agent.outputTokens = data.outputTokens;

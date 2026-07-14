@@ -89,6 +89,7 @@ components:
         - $ref: '#/components/schemas/ExistingAgents'
         # Agent status / tool activity
         - $ref: '#/components/schemas/AgentStatus'
+        - $ref: '#/components/schemas/AgentThought'
         - $ref: '#/components/schemas/AgentToolStart'
         - $ref: '#/components/schemas/AgentToolDone'
         - $ref: '#/components/schemas/AgentToolsClear'
@@ -352,6 +353,19 @@ components:
             idle waiting on the user (drives the "Waiting for input" label);
             absent/false means the agent finished its turn ("Done").
 
+    AgentThought:
+      description: A high-level Codex reasoning summary suitable for a transient speech bubble.
+      type: object
+      additionalProperties: false
+      required: [type, id, text]
+      properties:
+        type:
+          const: agentThought
+        id:
+          type: integer
+        text:
+          type: string
+
     AgentActivityStatus:
       description: Activity state of an agent.
       type: string
@@ -504,6 +518,8 @@ components:
         teamUsesTmux:
           type: boolean
         folderName:
+          type: string
+        sessionId:
           type: string
 
     AgentTokenUsage:

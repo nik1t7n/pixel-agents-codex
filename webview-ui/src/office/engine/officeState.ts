@@ -1,5 +1,4 @@
 import {
-  ACTIVITY_BUBBLE_DURATION_SEC,
   AUTO_ON_FACING_DEPTH,
   AUTO_ON_SIDE_DEPTH,
   CHARACTER_HIT_HALF_WIDTH,
@@ -14,6 +13,7 @@ import {
   MAX_PET_ID_LENGTH,
   PET_HIT_HALF_WIDTH,
   PET_HIT_HEIGHT,
+  THOUGHT_BUBBLE_DURATION_SEC,
   WAITING_BUBBLE_DURATION_SEC,
 } from '../../constants.js';
 import { getAnimationFrames, getCatalogEntry, getOnStateType } from '../layout/furnitureCatalog.js';
@@ -27,7 +27,7 @@ import {
 import { findPath, getWalkableTiles, isWalkable } from '../layout/tileMap.js';
 import { getPetCount, getPetName } from '../sprites/petSpriteData.js';
 import { getLoadedCharacterCount } from '../sprites/spriteData.js';
-import { agentActivityKind, agentActivityText } from '../toolUtils.js';
+import { agentActivityKind, stableAgentAppearance } from '../toolUtils.js';
 import type {
   Character,
   FurnitureInstance,
@@ -328,6 +328,9 @@ export class OfficeState {
   ): void {
     const existing = this.characters.get(id);
     if (existing) {
+      if (preferredPalette !== undefined) existing.palette = preferredPalette;
+      if (preferredHueShift !== undefined) existing.hueShift = preferredHueShift;
+      if (folderName !== undefined) existing.folderName = folderName;
       if (existing.matrixEffect === 'despawn') {
         existing.matrixEffect = 'spawn';
         existing.matrixEffectTimer = 0;
@@ -509,15 +512,19 @@ export class OfficeState {
     return true;
   }
 
-  /** Create a sub-agent character with the parent's palette. Returns the sub-agent ID. */
+  /** Create a sub-agent character with a stable appearance. Returns the sub-agent ID. */
   addSubagent(parentAgentId: number, parentToolId: string): number {
     const key = `${parentAgentId}:${parentToolId}`;
     if (this.subagentIdMap.has(key)) return this.subagentIdMap.get(key)!;
 
     const id = this.nextSubagentId--;
     const parentCh = this.characters.get(parentAgentId);
-    const palette = parentCh ? parentCh.palette : 0;
-    const hueShift = parentCh ? parentCh.hueShift : 0;
+    const appearance = stableAgentAppearance(parentToolId, getLoadedCharacterCount());
+    const palette =
+      parentCh && appearance.palette === parentCh.palette
+        ? (appearance.palette + 1) % getLoadedCharacterCount()
+        : appearance.palette;
+    const hueShift = appearance.hueShift;
 
     // Find the closest walkable tile to the parent, avoiding tiles occupied by other characters
     const parentCol = parentCh ? parentCh.tileCol : 0;
@@ -723,12 +730,14 @@ export class OfficeState {
     if (ch) {
       ch.currentTool = tool;
       ch.activityKind = tool ? agentActivityKind(tool, status) : undefined;
-      const text = tool ? agentActivityText(tool, status) : null;
-      if (text !== ch.activityBubbleText) {
-        ch.activityBubbleText = text;
-        ch.activityBubbleTimer = text ? ACTIVITY_BUBBLE_DURATION_SEC : 0;
-      }
     }
+  }
+
+  setAgentThought(id: number, text: string): void {
+    const ch = this.characters.get(id);
+    if (!ch || ch.thoughtText === text) return;
+    ch.thoughtText = text;
+    ch.thoughtTimer = THOUGHT_BUBBLE_DURATION_SEC;
   }
 
   showPermissionBubble(id: number): void {
@@ -976,11 +985,11 @@ export class OfficeState {
           ch.bubbleTimer = 0;
         }
       }
-      if (ch.activityBubbleTimer > 0) {
-        ch.activityBubbleTimer -= dt;
-        if (ch.activityBubbleTimer <= 0) {
-          ch.activityBubbleText = null;
-          ch.activityBubbleTimer = 0;
+      if (ch.thoughtTimer > 0) {
+        ch.thoughtTimer -= dt;
+        if (ch.thoughtTimer <= 0) {
+          ch.thoughtText = null;
+          ch.thoughtTimer = 0;
         }
       }
     }

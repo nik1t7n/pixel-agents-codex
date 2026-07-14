@@ -127,6 +127,21 @@ describe('codexProvider', () => {
     });
   });
 
+  it('parses the high-level Codex reasoning summary', () => {
+    expect(
+      parseCodexTranscriptLine(
+        JSON.stringify({
+          type: 'event_msg',
+          payload: { type: 'agent_reasoning', text: '**Verifying activity timer**' },
+        }),
+      ),
+    ).toEqual({
+      kind: 'progress',
+      toolId: 'agent-thought',
+      data: { type: 'agentThought', text: 'Verifying activity timer' },
+    });
+  });
+
   it('uses the current context usage instead of lifetime session tokens', () => {
     const event = parseCodexTranscriptLine(
       JSON.stringify({

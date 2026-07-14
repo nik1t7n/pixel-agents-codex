@@ -169,6 +169,13 @@ export function parseCodexTranscriptLine(line: string): AgentEvent | null {
       },
     };
   }
+  if (record.type === 'event_msg' && payload.type === 'agent_reasoning') {
+    const text =
+      typeof payload.text === 'string' ? payload.text.replace(/^\*\*|\*\*$/g, '').trim() : '';
+    return text
+      ? { kind: 'progress', toolId: 'agent-thought', data: { type: 'agentThought', text } }
+      : null;
+  }
   if (record.type === 'session_meta') {
     return {
       kind: 'sessionStart',

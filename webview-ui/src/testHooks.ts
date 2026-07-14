@@ -4,7 +4,12 @@ declare global {
   interface Window {
     __pixelAgentsTestHooks?: {
       playedSounds?: Array<{ kind: string; at: number }>;
-      getCharacters?: () => Array<{ id: number; matrixEffect: 'spawn' | 'despawn' | null }>;
+      getCharacters?: () => Array<{
+        id: number;
+        palette: number;
+        hueShift: number;
+        matrixEffect: 'spawn' | 'despawn' | null;
+      }>;
       getPets?: () => Array<{
         id: string;
         name: string;
@@ -64,6 +69,8 @@ export function installTestHooks(officeStateRef: { current: OfficeState | null }
     if (!os) return [];
     return Array.from(os.characters.values()).map((ch) => ({
       id: ch.id,
+      palette: ch.palette,
+      hueShift: ch.hueShift,
       matrixEffect: ch.matrixEffect,
     }));
   };

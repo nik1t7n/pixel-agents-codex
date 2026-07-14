@@ -17,6 +17,7 @@ export type ServerMessage =
   | AgentSelected
   | ExistingAgents
   | AgentStatus
+  | AgentThought
   | AgentToolStart
   | AgentToolDone
   | AgentToolsClear
@@ -145,6 +146,12 @@ export interface AgentStatus {
 
 export type AgentActivityStatus = 'active' | 'waiting';
 
+export interface AgentThought {
+  type: 'agentThought';
+  id: number;
+  text: string;
+}
+
 export interface AgentToolStart {
   type: 'agentToolStart';
   id: number;
@@ -212,6 +219,7 @@ export interface AgentTeamInfo {
   leadAgentId?: number;
   teamUsesTmux?: boolean;
   folderName?: string;
+  sessionId?: string;
 }
 
 export interface AgentTokenUsage {

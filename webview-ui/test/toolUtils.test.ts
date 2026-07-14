@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agentActivityKind,
-  agentActivityText,
   setProviderCapabilities,
+  stableAgentAppearance,
   stableAgentPalette,
 } from '../src/office/toolUtils.js';
 
@@ -21,14 +21,13 @@ describe('Codex activity kinds', () => {
     expect(agentActivityKind('spawn_agent')).toBe('communication');
     expect(agentActivityKind('ContextCompact')).toBe('compacting');
   });
+});
 
-  it('turns tool events into short speech bubbles', () => {
-    expect(agentActivityText('apply_patch', 'Editing files')).toBe('Editing code');
-    expect(agentActivityText('exec_command', 'Running: npm test')).toBe('Running tests');
-    expect(agentActivityText('web__run', 'Browsing the web')).toBe('Searching the web');
-    expect(agentActivityText('spawn_agent', 'Starting a subagent')).toBe('Talking to an agent');
-    expect(agentActivityText('ContextCompact', 'Compacting')).toBe('Compacting context');
-  });
+it('keeps the complete character appearance stable per Codex session', () => {
+  const first = stableAgentAppearance('019f5fcb-ca7a-7472-b593-c99784a1a248', 6);
+  const second = stableAgentAppearance('019f60c4-7640-7f00-8b75-d7ef60c084b3', 6);
+  expect(stableAgentAppearance('019f5fcb-ca7a-7472-b593-c99784a1a248', 6)).toEqual(first);
+  expect(second).not.toEqual(first);
 });
 
 it('keeps the same character palette for the same Codex session', () => {

@@ -86,8 +86,89 @@ function App() {
   } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty);
 
   const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
+  const openingSessionRef = useRef<string | null>(null);
+
+  const replaceUrlState = useCallback((sessionId?: string, agentId?: number | null) => {
+    const url = new URL(window.location.href);
+    if (sessionId) url.searchParams.set('session', sessionId);
+    else url.searchParams.delete('session');
+    if (agentId !== undefined && agentId !== null) url.searchParams.set('agent', String(agentId));
+    else url.searchParams.delete('agent');
+    window.history.replaceState(null, '', url);
+  }, []);
+
   useEffect(() => {
-    if (openedSession || sessionError) setOpeningSessionId(null);
+    const requestedSession = new URL(window.location.href).searchParams.get('session');
+    if (
+      requestedSession &&
+      openedSession?.id !== requestedSession &&
+      openingSessionRef.current !== requestedSession &&
+      sessions.some((session) => session.id === requestedSession)
+    ) {
+      openingSessionRef.current = requestedSession;
+      setOpeningSessionId(requestedSession);
+      transport.send({ type: 'openSession', sessionId: requestedSession });
+    }
+  }, [openedSession, openingSessionId, sessions]);
+
+  useEffect(() => {
+    if (!openedSession) return;
+    const requestedSession = new URL(window.location.href).searchParams.get('session');
+    if (requestedSession && requestedSession !== openedSession.id) return;
+    openingSessionRef.current = null;
+    setOpeningSessionId(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set('session', openedSession.id);
+    window.history.replaceState(null, '', url);
+  }, [openedSession]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const url = new URL(window.location.href);
+      const sessionId = url.searchParams.get('session');
+      const agentId = Number(url.searchParams.get('agent'));
+      if (!sessionId) {
+        if (openedSession) transport.send({ type: 'closeSession' });
+      } else if (sessionId !== openedSession?.id) {
+        setOpeningSessionId(sessionId);
+        transport.send({ type: 'openSession', sessionId });
+      } else if (officeStateRef.current) {
+        officeStateRef.current.selectedAgentId =
+          Number.isInteger(agentId) && officeStateRef.current.characters.has(agentId)
+            ? agentId
+            : null;
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [openedSession]);
+
+  useEffect(() => {
+    if (!openedSession) return;
+    let previous = officeStateRef.current?.selectedAgentId ?? null;
+    const requestedAgentParam = new URL(window.location.href).searchParams.get('agent');
+    const requestedAgent = requestedAgentParam === null ? NaN : Number(requestedAgentParam);
+    let restoredRequestedAgent = !Number.isInteger(requestedAgent);
+    const timer = window.setInterval(() => {
+      if (!restoredRequestedAgent) {
+        if (!officeStateRef.current?.characters.has(requestedAgent)) return;
+        officeStateRef.current.selectedAgentId = requestedAgent;
+        previous = requestedAgent;
+        restoredRequestedAgent = true;
+        return;
+      }
+      const current = officeStateRef.current?.selectedAgentId ?? null;
+      if (current === previous) return;
+      previous = current;
+      replaceUrlState(openedSession.id, current);
+    }, 200);
+    return () => window.clearInterval(timer);
+  }, [openedSession, replaceUrlState]);
+  useEffect(() => {
+    if (openedSession || sessionError) {
+      openingSessionRef.current = null;
+      setOpeningSessionId(null);
+    }
   }, [openedSession, sessionError]);
 
   // Show migration notice once layout reset is detected
@@ -194,7 +275,9 @@ function App() {
         openingSessionId={openingSessionId}
         error={sessionError}
         onOpen={(sessionId) => {
+          openingSessionRef.current = sessionId;
           setOpeningSessionId(sessionId);
+          replaceUrlState(sessionId, null);
           transport.send({ type: 'openSession', sessionId });
         }}
         onRefresh={() => transport.send({ type: 'refreshSessionCatalog' })}
@@ -224,7 +307,10 @@ function App() {
       {!editor.isEditMode && (
         <button
           type="button"
-          onClick={() => transport.send({ type: 'closeSession' })}
+          onClick={() => {
+            replaceUrlState();
+            transport.send({ type: 'closeSession' });
+          }}
           className="absolute left-56 top-8 z-20 cursor-pointer border-2 border-border bg-bg px-12 py-6 text-sm text-text shadow-pixel hover:bg-btn-hover"
         >
           Sessions

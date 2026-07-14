@@ -2,10 +2,6 @@ import type { ColorValue } from '../../components/ui/types.js';
 import {
   ACTIVITY_BADGE_BG,
   ACTIVITY_BADGE_COLORS,
-  ACTIVITY_BUBBLE_BG,
-  ACTIVITY_BUBBLE_BORDER,
-  ACTIVITY_BUBBLE_SHADOW,
-  ACTIVITY_BUBBLE_TEXT,
   BUBBLE_FADE_DURATION_SEC,
   BUBBLE_SITTING_OFFSET_PX,
   BUBBLE_VERTICAL_OFFSET_PX,
@@ -552,37 +548,6 @@ function renderBubbles(
   zoom: number,
 ): void {
   for (const ch of characters) {
-    if (!ch.bubbleType && ch.activityBubbleText && ch.activityBubbleTimer > 0) {
-      const alpha = Math.min(1, ch.activityBubbleTimer / BUBBLE_FADE_DURATION_SEC);
-      const sittingOff = ch.state === CharacterState.TYPE ? BUBBLE_SITTING_OFFSET_PX : 0;
-      const fontSize = 6 * zoom;
-      const paddingX = 3 * zoom;
-      const paddingY = 2 * zoom;
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.font = `${fontSize}px "FS Pixel Sans"`;
-      ctx.textBaseline = 'top';
-      const textWidth = Math.ceil(ctx.measureText(ch.activityBubbleText).width);
-      const width = textWidth + paddingX * 2;
-      const height = fontSize + paddingY * 2;
-      const x = Math.round(offsetX + ch.x * zoom - width / 2);
-      const y = Math.round(
-        offsetY + (ch.y + sittingOff - BUBBLE_VERTICAL_OFFSET_PX) * zoom - height - 2 * zoom,
-      );
-      ctx.fillStyle = ACTIVITY_BUBBLE_SHADOW;
-      ctx.fillRect(x + 2 * zoom, y + 2 * zoom, width, height);
-      ctx.fillStyle = ACTIVITY_BUBBLE_BG;
-      ctx.fillRect(x, y, width, height);
-      ctx.strokeStyle = ACTIVITY_BUBBLE_BORDER;
-      ctx.lineWidth = zoom;
-      ctx.strokeRect(x, y, width, height);
-      ctx.fillStyle = ACTIVITY_BUBBLE_BORDER;
-      ctx.fillRect(Math.round(x + width / 2 - zoom), y + height, 3 * zoom, 2 * zoom);
-      ctx.fillStyle = ACTIVITY_BUBBLE_TEXT;
-      ctx.fillText(ch.activityBubbleText, x + paddingX, y + paddingY);
-      ctx.restore();
-      continue;
-    }
     if (!ch.bubbleType) continue;
     // The green checkmark bubble only represents "done" (turn finished). The
     // idle "Waiting for input" state communicates via its overlay label, not a

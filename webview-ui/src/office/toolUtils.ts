@@ -74,28 +74,22 @@ export function agentActivityKind(toolName: string | null, status = ''): AgentAc
   return 'working';
 }
 
-export function agentActivityText(toolName: string | null, status = ''): string {
-  const kind = agentActivityKind(toolName, status);
-  if (kind === 'reading') return 'Reading code';
-  if (kind === 'coding') return 'Editing code';
-  if (kind === 'testing') return 'Running tests';
-  if (kind === 'browser') return 'Searching the web';
-  if (kind === 'communication') return 'Talking to an agent';
-  if (kind === 'compacting') return 'Compacting context';
-  if (toolName === 'exec_command' || toolName === 'exec' || toolName === 'write_stdin') {
-    return 'Running a command';
-  }
-  const shortStatus = status
-    .replace(/^Using\s+/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return shortStatus ? shortStatus.slice(0, 32) : 'Working';
-}
-
 export function stableAgentPalette(sessionId: string, paletteCount: number): number {
   let hash = 2166136261;
   for (let index = 0; index < sessionId.length; index++) {
     hash = Math.imul(hash ^ sessionId.charCodeAt(index), 16777619);
   }
   return (hash >>> 0) % paletteCount;
+}
+
+export function stableAgentAppearance(
+  sessionId: string,
+  paletteCount: number,
+): { palette: number; hueShift: number } {
+  const palette = stableAgentPalette(sessionId, paletteCount);
+  let hash = 2166136261;
+  for (let index = sessionId.length - 1; index >= 0; index--) {
+    hash = Math.imul(hash ^ sessionId.charCodeAt(index), 16777619);
+  }
+  return { palette, hueShift: ((hash >>> 0) % 315) + 23 };
 }

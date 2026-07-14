@@ -32,7 +32,10 @@ import {
 } from './fileWatcher.js';
 import type { HookEvent } from './hookEventHandler.js';
 import { HookEventHandler } from './hookEventHandler.js';
-import { readCodexSessionMeta } from './providers/hook/codex/codexSessionCatalog.js';
+import {
+  isCodexSessionActive,
+  readCodexSessionMeta,
+} from './providers/hook/codex/codexSessionCatalog.js';
 import { SessionRouter } from './sessionRouter.js';
 import { cancelPermissionTimer, cancelWaitingTimer } from './timerManager.js';
 import { setHookProvider } from './transcriptParser.js';
@@ -146,6 +149,7 @@ export class AgentRuntime {
               isTeamLead: false,
               leadAgentId: agent.leadAgentId,
               folderName: cwd ? path.basename(cwd) : agent.folderName,
+              sessionId: agent.sessionId,
             });
             this.store.persist();
           },
@@ -289,10 +293,12 @@ export class AgentRuntime {
       agentName: lead.agentName,
       isTeamLead: true,
       folderName: session.cwd ? path.basename(session.cwd) : lead.folderName,
+      sessionId: lead.sessionId,
     });
 
     const agentIdsBySession = new Map<string, number>([[session.id, lead.id]]);
     for (const child of session.children ?? []) {
+      if (!isCodexSessionActive(child.transcriptPath)) continue;
       this.dismissalTracker.clearDismissal(child.transcriptPath);
       this.dismissalTracker.clearPermanentDismissal(child.transcriptPath);
       adoptExternalSessionFromHook(
@@ -323,6 +329,7 @@ export class AgentRuntime {
             isTeamLead: false,
             leadAgentId: agent.leadAgentId,
             folderName: child.cwd ? path.basename(child.cwd) : agent.folderName,
+            sessionId: agent.sessionId,
           });
         },
         false,

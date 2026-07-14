@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '../../components/ui/Button.js';
 import {
+  BUBBLE_FADE_DURATION_SEC,
   CHARACTER_SITTING_OFFSET_PX,
   FUEL_COLOR_CRITICAL,
   FUEL_COLOR_DANGER,
@@ -36,6 +37,69 @@ interface ToolOverlayProps {
   panRef: React.RefObject<{ x: number; y: number }>;
   onDismissAgentInfo: () => void;
   alwaysShowOverlay: boolean;
+}
+
+interface AgentDetail {
+  title: string;
+  role: string;
+  folder?: string;
+  model?: string;
+  effort?: string;
+  tools: ToolActivity[];
+}
+
+function AgentDetailDialog({ detail, onClose }: { detail: AgentDetail; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    ref.current?.showModal();
+  }, []);
+
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      className="pixel-agent-dialog pixel-panel m-auto max-h-[70dvh] w-[min(520px,calc(100dvw-32px))] overflow-hidden p-0 text-text"
+      aria-labelledby="agent-detail-title"
+    >
+      <div className="flex items-start justify-between gap-16 border-b-2 border-border px-16 py-12">
+        <div className="min-w-0">
+          <div className="text-2xs text-text-muted">{detail.role}</div>
+          <h2 id="agent-detail-title" className="mt-4 text-lg leading-tight text-pretty">
+            {detail.title}
+          </h2>
+          {(detail.folder || detail.model) && (
+            <div className="mt-6 truncate text-2xs text-text-muted">
+              {[detail.folder, detail.model, detail.effort].filter(Boolean).join(' · ')}
+            </div>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => ref.current?.close()}
+          aria-label="Close agent details"
+          className="size-24 shrink-0 text-sm"
+        >
+          ×
+        </Button>
+      </div>
+      <div className="max-h-[45dvh] overflow-y-auto overscroll-contain px-16 py-12">
+        <div className="mb-8 text-2xs text-text-muted">Recent actions</div>
+        {detail.tools.length > 0 ? (
+          <ul className="m-0 flex list-none flex-col gap-8 p-0">
+            {detail.tools.slice(-10).map((tool) => (
+              <li key={tool.toolId} className="flex items-start gap-8 text-sm leading-tight">
+                <span className="mt-2 shrink-0 text-text-muted">{tool.done ? '✓' : '›'}</span>
+                <span className={tool.done ? 'text-text-muted' : 'text-text'}>{tool.status}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="m-0 text-sm text-text-muted">No tool calls in this step yet.</p>
+        )}
+      </div>
+    </dialog>
+  );
 }
 
 /** Derive a short human-readable activity string from tools/status */
@@ -89,6 +153,7 @@ export function ToolOverlay({
   alwaysShowOverlay,
 }: ToolOverlayProps) {
   const [, setTick] = useState(0);
+  const [detail, setDetail] = useState<AgentDetail | null>(null);
   useEffect(() => {
     let rafId = 0;
     const tick = () => {
@@ -119,6 +184,43 @@ export function ToolOverlay({
 
   return (
     <>
+      {allIds.map((id) => {
+        const ch = officeState.characters.get(id);
+        if (!ch?.thoughtText || ch.thoughtTimer <= 0 || ch.bubbleType) return null;
+        const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+        const screenX = (deviceOffsetX + ch.x * zoom) / dpr;
+        const screenY =
+          (deviceOffsetY + (ch.y + sittingOffset - TOOL_OVERLAY_VERTICAL_OFFSET) * zoom) / dpr;
+        const role = ch.isTeamLead
+          ? 'LEAD'
+          : ch.agentName || (ch.isSubagent ? 'SUBAGENT' : 'AGENT');
+        return (
+          <button
+            key={`${id}:${ch.thoughtText}`}
+            type="button"
+            className="agent-thought-bubble absolute z-30 flex max-w-260 -translate-x-1/2 items-center border-2 border-border bg-bg px-10 py-6 text-left text-2xs leading-tight text-text shadow-pixel"
+            style={{
+              left: screenX,
+              top: screenY - 42,
+              opacity: Math.min(1, ch.thoughtTimer / BUBBLE_FADE_DURATION_SEC),
+            }}
+            onClick={() =>
+              setDetail({
+                title: ch.thoughtText!,
+                role,
+                folder: ch.folderName,
+                model: ch.model,
+                effort: ch.effort,
+                tools: agentTools[id] ?? [],
+              })
+            }
+            title={ch.thoughtText}
+            aria-label={`Open agent details: ${ch.thoughtText}`}
+          >
+            <span className="min-w-0 truncate">{ch.thoughtText}</span>
+          </button>
+        );
+      })}
       {allIds.map((id) => {
         const ch = officeState.characters.get(id);
         if (!ch) return null;
@@ -285,6 +387,7 @@ export function ToolOverlay({
           </div>
         );
       })}
+      {detail && <AgentDetailDialog detail={detail} onClose={() => setDetail(null)} />}
     </>
   );
 }

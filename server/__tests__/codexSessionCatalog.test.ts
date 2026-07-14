@@ -3,7 +3,10 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { CodexSessionCatalog } from '../src/providers/hook/codex/codexSessionCatalog.js';
+import {
+  CodexSessionCatalog,
+  isCodexSessionActive,
+} from '../src/providers/hook/codex/codexSessionCatalog.js';
 
 const tempRoots: string[] = [];
 
@@ -18,6 +21,24 @@ function fixtureCodexHome(): string {
 }
 
 describe('CodexSessionCatalog', () => {
+  it('reports only an unfinished latest turn as active', () => {
+    const root = fixtureCodexHome();
+    const transcript = path.join(root, 'agent.jsonl');
+    fs.writeFileSync(
+      transcript,
+      [
+        JSON.stringify({ type: 'event_msg', payload: { type: 'task_started' } }),
+        JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete' } }),
+      ].join('\n'),
+    );
+    expect(isCodexSessionActive(transcript)).toBe(false);
+    fs.appendFileSync(
+      transcript,
+      `\n${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started' } })}`,
+    );
+    expect(isCodexSessionActive(transcript)).toBe(true);
+  });
+
   it('deduplicates the session index and keeps the newest title', () => {
     const root = fixtureCodexHome();
     fs.writeFileSync(
