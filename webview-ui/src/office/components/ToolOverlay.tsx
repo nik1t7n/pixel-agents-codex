@@ -37,7 +37,7 @@ interface ToolOverlayProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   zoom: number;
   panRef: React.RefObject<{ x: number; y: number }>;
-  onCloseAgent: (id: number) => void;
+  onDismissAgentInfo: () => void;
   alwaysShowOverlay: boolean;
 }
 
@@ -88,7 +88,7 @@ export function ToolOverlay({
   containerRef,
   zoom,
   panRef,
-  onCloseAgent,
+  onDismissAgentInfo,
   alwaysShowOverlay,
 }: ToolOverlayProps) {
   const [, setTick] = useState(0);
@@ -267,9 +267,10 @@ export function ToolOverlay({
                   size="icon"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onCloseAgent(id);
+                    onDismissAgentInfo();
                   }}
-                  title="Close agent"
+                  title="Close agent info"
+                  aria-label="Close agent info"
                   className="ml-2 shrink-0 leading-none"
                 >
                   ×

@@ -92,7 +92,7 @@
   html,
   body,
   #root {
-    @apply m-0 w-full h-full overflow-hidden font-pixel text-base text-text;
+    @apply m-0 w-full h-full overflow-hidden overscroll-none bg-bg-dark font-pixel text-base text-text;
   }
 
   * {

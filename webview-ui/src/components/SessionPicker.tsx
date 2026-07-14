@@ -43,7 +43,7 @@ export function SessionPicker({
   }, [query, sessions]);
 
   return (
-    <main className="min-h-full bg-bg-dark p-20 overflow-auto">
+    <main className="h-full overflow-x-hidden overflow-y-auto overscroll-none bg-bg-dark p-20">
       <div className="mx-auto max-w-760">
         <header className="mb-18 flex items-end justify-between gap-16">
           <div>

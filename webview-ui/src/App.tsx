@@ -145,8 +145,10 @@ function App() {
     editor.handleToggleEditMode,
   );
 
-  const handleCloseAgent = useCallback((id: number) => {
-    transport.send({ type: 'closeAgent', id });
+  const handleDismissAgentInfo = useCallback(() => {
+    const os = getOfficeState();
+    os.selectedAgentId = null;
+    os.cameraFollowId = null;
   }, []);
 
   const handleClick = useCallback((agentId: number) => {
@@ -223,7 +225,7 @@ function App() {
         <button
           type="button"
           onClick={() => transport.send({ type: 'closeSession' })}
-          className="absolute left-10 top-10 z-20 cursor-pointer border-2 border-border bg-bg px-12 py-6 text-sm text-text shadow-pixel hover:bg-btn-hover"
+          className="absolute left-56 top-8 z-20 cursor-pointer border-2 border-border bg-bg px-12 py-6 text-sm text-text shadow-pixel hover:bg-btn-hover"
         >
           Sessions
         </button>
@@ -291,7 +293,7 @@ function App() {
             containerRef={containerRef}
             zoom={editor.zoom}
             panRef={editor.panRef}
-            onCloseAgent={handleCloseAgent}
+            onDismissAgentInfo={handleDismissAgentInfo}
             alwaysShowOverlay={alwaysShowOverlay}
           />
         </>
