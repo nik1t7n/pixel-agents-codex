@@ -146,6 +146,14 @@ describe('codexProvider', () => {
     });
   });
 
+  it('treats a user-aborted Codex turn as a finished turn', () => {
+    expect(
+      parseCodexTranscriptLine(
+        JSON.stringify({ type: 'event_msg', payload: { type: 'turn_aborted' } }),
+      ),
+    ).toEqual({ kind: 'turnEnd', awaitingInput: true });
+  });
+
   it('parses the model and multi-agent mode used by a Codex turn', () => {
     expect(
       parseCodexTranscriptLine(

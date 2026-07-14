@@ -166,6 +166,16 @@ export function useExtensionMessages(
         setSessions(msg.sessions);
         setOpenedSession(msg.selectedSession ?? null);
         setSessionError(null);
+        if (!msg.selectedSession) {
+          os.clearAgents();
+          pendingAgents = [];
+          setAgents([]);
+          setSelectedAgent(null);
+          setAgentTools({});
+          setAgentStatuses({});
+          setSubagentTools({});
+          setSubagentCharacters([]);
+        }
         return;
       }
 

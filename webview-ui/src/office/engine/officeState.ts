@@ -397,6 +397,17 @@ export class OfficeState {
     ch.bubbleType = null;
   }
 
+  clearAgents(): void {
+    this.characters.clear();
+    this.subagentIdMap.clear();
+    this.subagentMeta.clear();
+    this.selectedAgentId = null;
+    this.hoveredAgentId = null;
+    this.cameraFollowId = null;
+    for (const seat of this.seats.values()) seat.assigned = false;
+    this.rebuildFurnitureInstances();
+  }
+
   /** Find seat uid at a given tile position, or null */
   getSeatAtTile(col: number, row: number): string | null {
     for (const [uid, seat] of this.seats) {

@@ -449,7 +449,21 @@ function processProviderTranscriptEvent(
     }
     case 'turnEnd': {
       cancelPermissionTimer(agentId, permissionTimers);
+      for (const toolId of [...agent.activeToolIds]) {
+        if (agent.backgroundAgentToolIds.has(toolId)) continue;
+        agent.activeToolIds.delete(toolId);
+        agent.activeToolStatuses.delete(toolId);
+        agent.activeToolNames.delete(toolId);
+        agent.activeSubagentToolIds.delete(toolId);
+        agent.activeSubagentToolNames.delete(toolId);
+      }
+      agents.broadcast({ type: 'agentToolsClear', id: agentId });
+      for (const toolId of agent.backgroundAgentToolIds) {
+        const status = agent.activeToolStatuses.get(toolId);
+        if (status) agents.broadcast({ type: 'agentToolStart', id: agentId, toolId, status });
+      }
       agent.isWaiting = true;
+      agent.permissionSent = false;
       agent.hadToolsInTurn = false;
       agents.broadcast({
         type: 'agentStatus',

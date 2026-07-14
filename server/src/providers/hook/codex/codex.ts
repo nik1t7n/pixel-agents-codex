@@ -216,7 +216,10 @@ export function parseCodexTranscriptLine(line: string): AgentEvent | null {
     };
   }
 
-  if (record.type === 'event_msg' && payload.type === 'task_complete') {
+  if (
+    record.type === 'event_msg' &&
+    (payload.type === 'task_complete' || payload.type === 'turn_aborted')
+  ) {
     return { kind: 'turnEnd', awaitingInput: true };
   }
 
