@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { agentActivityKind, setProviderCapabilities } from '../src/office/toolUtils.js';
+import {
+  agentActivityKind,
+  setProviderCapabilities,
+  stableAgentPalette,
+} from '../src/office/toolUtils.js';
 
 describe('Codex activity kinds', () => {
   it('maps real tool events to compact pixel states', () => {
@@ -16,4 +20,11 @@ describe('Codex activity kinds', () => {
     expect(agentActivityKind('spawn_agent')).toBe('communication');
     expect(agentActivityKind('ContextCompact')).toBe('compacting');
   });
+});
+
+it('keeps the same character palette for the same Codex session', () => {
+  const sessionId = '019f5fcb-ca7a-7472-b593-c99784a1a248';
+  expect(stableAgentPalette(sessionId, 6)).toBe(stableAgentPalette(sessionId, 6));
+  expect(stableAgentPalette(sessionId, 6)).toBeGreaterThanOrEqual(0);
+  expect(stableAgentPalette(sessionId, 6)).toBeLessThan(6);
 });

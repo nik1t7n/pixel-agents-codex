@@ -103,6 +103,7 @@ export interface SessionOpenFailed {
 export interface AgentCreated {
   type: 'agentCreated';
   id: number;
+  sessionId?: string;
   folderName?: string;
   isExternal?: boolean;
 }
@@ -123,6 +124,7 @@ export interface ExistingAgents {
   agentMeta: Record<string, AgentSeatMeta>;
   folderNames: Record<string, string>;
   externalAgents: Record<string, boolean>;
+  sessionIds: Record<string, string>;
 }
 
 export interface AgentSeatMeta {

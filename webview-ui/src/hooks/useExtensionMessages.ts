@@ -8,10 +8,12 @@ import { buildDynamicCatalog } from '../office/layout/furnitureCatalog.js';
 import { migrateLayoutColors } from '../office/layout/layoutSerializer.js';
 import { setPetTemplates } from '../office/sprites/petSpriteData.js';
 import { setCharacterTemplates } from '../office/sprites/spriteData.js';
+import { getLoadedCharacterCount } from '../office/sprites/spriteData.js';
 import {
   extractToolName,
   isSubagentToolName,
   setProviderCapabilities,
+  stableAgentPalette,
 } from '../office/toolUtils.js';
 import type { OfficeLayout, ToolActivity } from '../office/types.js';
 import { setWallSprites } from '../office/wallTiles.js';
@@ -87,6 +89,11 @@ function saveAgentSeats(os: OfficeState): void {
   transport.send({ type: 'saveAgentSeats', seats });
 }
 
+function sessionPalette(sessionId: string | undefined): number | undefined {
+  if (!sessionId) return undefined;
+  return stableAgentPalette(sessionId, getLoadedCharacterCount());
+}
+
 export function useExtensionMessages(
   getOfficeState: () => OfficeState,
   onLayoutLoaded?: (layout: OfficeLayout) => void,
@@ -128,6 +135,7 @@ export function useExtensionMessages(
       hueShift?: number;
       seatId?: string;
       folderName?: string;
+      sessionId?: string;
     }> = [];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -220,6 +228,7 @@ export function useExtensionMessages(
         }
       } else if (msg.type === 'agentCreated') {
         const id = msg.id as number;
+        const palette = sessionPalette(msg.sessionId as string | undefined);
         const folderName = msg.folderName as string | undefined;
         const isTeammate = msg.isTeammate as boolean | undefined;
         const teammateName = msg.teammateName as string | undefined;
@@ -234,9 +243,9 @@ export function useExtensionMessages(
           // Teammate: inherit parent's palette and workspace folderName (teammate runs
           // in the same workspace as the lead). Name shown via agentName (teamRoleLabel).
           const parentCh = os.characters.get(teammateParentId);
-          const palette = parentCh ? parentCh.palette : undefined;
+          const teammatePalette = parentCh ? parentCh.palette : palette;
           const hueShift = parentCh ? parentCh.hueShift : undefined;
-          os.addAgent(id, palette, hueShift, undefined, undefined, parentCh?.folderName);
+          os.addAgent(id, teammatePalette, hueShift, undefined, undefined, parentCh?.folderName);
           // Set team metadata on the character
           const ch = os.characters.get(id);
           if (ch) {
@@ -245,7 +254,7 @@ export function useExtensionMessages(
             ch.agentName = teammateName;
           }
         } else {
-          os.addAgent(id, undefined, undefined, undefined, undefined, folderName);
+          os.addAgent(id, palette, 0, undefined, undefined, folderName);
         }
         saveAgentSeats(os);
       } else if (msg.type === 'agentClosed') {
@@ -281,15 +290,17 @@ export function useExtensionMessages(
           { palette?: number; hueShift?: number; seatId?: string }
         >;
         const folderNames = (msg.folderNames || {}) as Record<number, string>;
+        const sessionIds = (msg.sessionIds || {}) as Record<number, string>;
         // Buffer agents — they'll be added in layoutLoaded after seats are built
         for (const id of incoming) {
           const m = meta[id];
           pendingAgents.push({
             id,
-            palette: m?.palette,
-            hueShift: m?.hueShift,
+            palette: sessionPalette(sessionIds[id]) ?? m?.palette,
+            hueShift: sessionIds[id] ? 0 : m?.hueShift,
             seatId: m?.seatId,
             folderName: folderNames[id],
+            sessionId: sessionIds[id],
           });
         }
         setAgents((prev) => {

@@ -73,3 +73,11 @@ export function agentActivityKind(toolName: string | null, status = ''): AgentAc
   }
   return 'working';
 }
+
+export function stableAgentPalette(sessionId: string, paletteCount: number): number {
+  let hash = 2166136261;
+  for (let index = 0; index < sessionId.length; index++) {
+    hash = Math.imul(hash ^ sessionId.charCodeAt(index), 16777619);
+  }
+  return (hash >>> 0) % paletteCount;
+}

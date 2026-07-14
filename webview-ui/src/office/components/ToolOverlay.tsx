@@ -7,9 +7,6 @@ import {
   FUEL_COLOR_DANGER,
   FUEL_COLOR_OK,
   FUEL_COLOR_WARN,
-  FUEL_GAUGE_BG,
-  FUEL_GAUGE_HEIGHT_PX,
-  FUEL_GAUGE_WIDTH_PX,
   MAX_CONTEXT_TOKENS,
   TEAM_LEAD_COLOR,
   TEAM_ROLE_COLOR,
@@ -198,7 +195,6 @@ export function ToolOverlay({
         }
 
         // Team info
-        const isTeamAgent = !!ch.teamName;
         const teamRoleLabel = ch.isTeamLead ? 'LEAD' : ch.agentName || null;
         const totalTokens = ch.inputTokens + ch.outputTokens;
         const contextWindow = ch.contextWindow ?? MAX_CONTEXT_TOKENS;
@@ -219,46 +215,55 @@ export function ToolOverlay({
             data-testid="agent-overlay"
             data-agent-id={id}
           >
-            <div className="flex items-center border-border px-8 pt-2 pb-4 gap-5 pixel-panel whitespace-nowrap max-w-2xs">
+            <div className="flex max-w-192 items-center gap-4 whitespace-nowrap border-border px-6 py-4 pixel-panel">
               {dotColor && (
                 <span
                   className={`w-6 h-6 rounded-full shrink-0 ${isActive && !hasPermission && !hasWaiting ? 'pixel-pulse' : ''}`}
                   style={{ background: dotColor }}
                 />
               )}
-              <div className="flex flex-col gap-0 overflow-hidden">
-                {teamRoleLabel && (
-                  <span
-                    className="overflow-hidden text-ellipsis block leading-none"
-                    style={{
-                      fontSize: '18px',
-                      color: ch.isTeamLead ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
-                      fontWeight: ch.isTeamLead ? 'bold' : undefined,
-                    }}
+              <div className="min-w-0 overflow-hidden">
+                <div className="flex items-baseline gap-4 overflow-hidden leading-none">
+                  {teamRoleLabel && (
+                    <span
+                      className="shrink-0"
+                      style={{
+                        fontSize: '16px',
+                        color: ch.isTeamLead ? TEAM_LEAD_COLOR : TEAM_ROLE_COLOR,
+                        fontWeight: ch.isTeamLead ? 'bold' : undefined,
+                      }}
+                    >
+                      {teamRoleLabel}
+                    </span>
+                  )}
+                  <span className="truncate" style={{ fontSize: '18px' }}>
+                    {activityText}
+                  </span>
+                </div>
+                {(ch.folderName || (isSelected && ch.model) || totalTokens > 0) && (
+                  <div
+                    className="mt-2 flex min-w-0 items-center gap-2 overflow-hidden leading-none text-text-muted"
+                    style={{ fontSize: '13px', opacity: 0.65 }}
                   >
-                    {teamRoleLabel}
-                  </span>
-                )}
-                <span
-                  className="overflow-hidden text-ellipsis block leading-none"
-                  style={{
-                    fontSize: isSub ? '20px' : '22px',
-                    fontStyle: isSub ? 'italic' : undefined,
-                  }}
-                >
-                  {activityText}
-                </span>
-                {ch.folderName && (
-                  <span className="text-2xs leading-none overflow-hidden text-ellipsis block">
-                    {ch.folderName}
-                  </span>
-                )}
-                {isSelected && ch.model && (
-                  <span className="text-2xs leading-none text-text-muted">
-                    {ch.model}
-                    {ch.effort ? ` · ${ch.effort}` : ''}
-                    {ch.multiAgentVersion ? ` · ${ch.multiAgentVersion}` : ''}
-                  </span>
+                    {ch.folderName && <span className="truncate">{ch.folderName}</span>}
+                    {isSelected && ch.model && (
+                      <span className="shrink-0">
+                        {ch.folderName ? '· ' : ''}
+                        {ch.model}
+                        {ch.effort ? ` · ${ch.effort}` : ''}
+                        {ch.multiAgentVersion ? ` · ${ch.multiAgentVersion}` : ''}
+                      </span>
+                    )}
+                    {totalTokens > 0 && (
+                      <span
+                        className="shrink-0 tabular-nums"
+                        style={{ color: getFuelColor(tokenRatio) }}
+                        title={`${Math.round(tokenRatio * 100)}% context used (${(totalTokens / 1000).toFixed(0)}k / ${(contextWindow / 1000).toFixed(0)}k tokens)`}
+                      >
+                        · ctx {Math.round(tokenRatio * 100)}%
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
               {isSelected && !isSub && (
@@ -271,31 +276,12 @@ export function ToolOverlay({
                   }}
                   title="Close agent info"
                   aria-label="Close agent info"
-                  className="ml-2 shrink-0 leading-none"
+                  className="ml-1 size-14 shrink-0 border-0 text-sm leading-none opacity-50 hover:opacity-100"
                 >
                   ×
                 </Button>
               )}
             </div>
-            {isTeamAgent && totalTokens > 0 && (
-              <div
-                style={{
-                  width: FUEL_GAUGE_WIDTH_PX,
-                  height: FUEL_GAUGE_HEIGHT_PX,
-                  background: FUEL_GAUGE_BG,
-                  marginTop: 2,
-                }}
-                title={`${Math.round(tokenRatio * 100)}% context used (${(totalTokens / 1000).toFixed(0)}k / ${(contextWindow / 1000).toFixed(0)}k tokens)`}
-              >
-                <div
-                  style={{
-                    width: `${Math.min(tokenRatio * 100, 100)}%`,
-                    height: '100%',
-                    background: getFuelColor(tokenRatio),
-                  }}
-                />
-              </div>
-            )}
           </div>
         );
       })}

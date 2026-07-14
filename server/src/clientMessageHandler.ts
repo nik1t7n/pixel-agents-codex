@@ -237,8 +237,10 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   const agentIds: number[] = [];
   const folderNames: Record<number, string> = {};
   const externalAgents: Record<number, boolean> = {};
+  const sessionIds: Record<number, string> = {};
   for (const [id, agent] of store) {
     agentIds.push(id);
+    sessionIds[id] = agent.sessionId;
     if (agent.folderName) {
       folderNames[id] = agent.folderName;
     }
@@ -253,6 +255,7 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
     agentMeta: seats,
     folderNames,
     externalAgents,
+    sessionIds,
   });
 }
 

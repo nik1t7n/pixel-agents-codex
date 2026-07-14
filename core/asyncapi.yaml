@@ -243,6 +243,8 @@ components:
           const: agentCreated
         id:
           type: integer
+        sessionId:
+          type: string
         folderName:
           type: string
         isExternal:
@@ -276,7 +278,7 @@ components:
         changes that the client missed. Includes seat/palette assignments.
       type: object
       additionalProperties: false
-      required: [type, agents, agentMeta, folderNames, externalAgents]
+      required: [type, agents, agentMeta, folderNames, externalAgents, sessionIds]
       properties:
         type:
           const: existingAgents
@@ -299,6 +301,11 @@ components:
           description: Map of agent ID (string) to external flag.
           additionalProperties:
             type: boolean
+        sessionIds:
+          type: object
+          description: Map of runtime agent ID (string) to stable Codex session ID.
+          additionalProperties:
+            type: string
 
     AgentStatus:
       description: Active vs waiting state for an agent (drives character animation).
