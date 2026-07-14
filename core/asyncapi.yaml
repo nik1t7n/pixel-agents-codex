@@ -278,7 +278,18 @@ components:
         changes that the client missed. Includes seat/palette assignments.
       type: object
       additionalProperties: false
-      required: [type, agents, agentMeta, folderNames, externalAgents, sessionIds]
+      required:
+        [
+          type,
+          agents,
+          agentMeta,
+          folderNames,
+          externalAgents,
+          sessionIds,
+          parentAgentIds,
+          agentNames,
+          activeAgentIds,
+        ]
       properties:
         type:
           const: existingAgents
@@ -306,6 +317,21 @@ components:
           description: Map of runtime agent ID (string) to stable Codex session ID.
           additionalProperties:
             type: string
+        parentAgentIds:
+          type: object
+          description: Map of child runtime agent ID (string) to its parent runtime agent ID.
+          additionalProperties:
+            type: integer
+        agentNames:
+          type: object
+          description: Map of runtime agent ID (string) to its human-readable role name.
+          additionalProperties:
+            type: string
+        activeAgentIds:
+          type: array
+          description: Runtime agent IDs currently doing real work.
+          items:
+            type: integer
 
     AgentStatus:
       description: Active vs waiting state for an agent (drives character animation).

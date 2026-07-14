@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   agentActivityKind,
+  agentActivityText,
   setProviderCapabilities,
   stableAgentPalette,
 } from '../src/office/toolUtils.js';
@@ -19,6 +20,14 @@ describe('Codex activity kinds', () => {
     expect(agentActivityKind('web__run')).toBe('browser');
     expect(agentActivityKind('spawn_agent')).toBe('communication');
     expect(agentActivityKind('ContextCompact')).toBe('compacting');
+  });
+
+  it('turns tool events into short speech bubbles', () => {
+    expect(agentActivityText('apply_patch', 'Editing files')).toBe('Editing code');
+    expect(agentActivityText('exec_command', 'Running: npm test')).toBe('Running tests');
+    expect(agentActivityText('web__run', 'Browsing the web')).toBe('Searching the web');
+    expect(agentActivityText('spawn_agent', 'Starting a subagent')).toBe('Talking to an agent');
+    expect(agentActivityText('ContextCompact', 'Compacting')).toBe('Compacting context');
   });
 });
 

@@ -2,6 +2,10 @@ import type { ColorValue } from '../../components/ui/types.js';
 import {
   ACTIVITY_BADGE_BG,
   ACTIVITY_BADGE_COLORS,
+  ACTIVITY_BUBBLE_BG,
+  ACTIVITY_BUBBLE_BORDER,
+  ACTIVITY_BUBBLE_SHADOW,
+  ACTIVITY_BUBBLE_TEXT,
   BUBBLE_FADE_DURATION_SEC,
   BUBBLE_SITTING_OFFSET_PX,
   BUBBLE_VERTICAL_OFFSET_PX,
@@ -32,6 +36,7 @@ import {
   SELECTED_OUTLINE_ALPHA,
   SELECTION_DASH_PATTERN,
   SELECTION_HIGHLIGHT_COLOR,
+  SUBAGENT_LINK_COLOR,
   VOID_TILE_DASH_PATTERN,
   VOID_TILE_OUTLINE_COLOR,
 } from '../../constants.js';
@@ -52,7 +57,7 @@ import type {
   SpriteData,
   TileType as TileTypeVal,
 } from '../types.js';
-import { CharacterState, TILE_SIZE, TileType } from '../types.js';
+import { CharacterState, MATRIX_EFFECT_DURATION, TILE_SIZE, TileType } from '../types.js';
 import { getWallInstances, hasWallSprites, wallColorToHex } from '../wallTiles.js';
 import { getCharacterSprite } from './characters.js';
 import { renderMatrixEffect } from './matrixEffect.js';
@@ -125,6 +130,29 @@ export function renderScene(
   pets: Pet[] = [],
 ): void {
   const drawables: ZDrawable[] = [];
+
+  // Keep the parent relationship visible without turning the room into a graph.
+  // Lines are painted before furniture and characters so the world stays dominant.
+  const charactersById = new Map(characters.map((ch) => [ch.id, ch]));
+  ctx.save();
+  ctx.strokeStyle = SUBAGENT_LINK_COLOR;
+  ctx.lineWidth = Math.max(1, zoom * 0.5);
+  ctx.setLineDash([2 * zoom, 2 * zoom]);
+  for (const ch of characters) {
+    const parentId = ch.parentAgentId ?? ch.leadAgentId;
+    if (parentId === null || parentId === undefined) continue;
+    const parent = charactersById.get(parentId);
+    if (!parent) continue;
+    let alpha = 1;
+    if (ch.matrixEffect === 'spawn') alpha = ch.matrixEffectTimer / MATRIX_EFFECT_DURATION;
+    if (ch.matrixEffect === 'despawn') alpha = 1 - ch.matrixEffectTimer / MATRIX_EFFECT_DURATION;
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.beginPath();
+    ctx.moveTo(offsetX + parent.x * zoom, offsetY + (parent.y - 8) * zoom);
+    ctx.lineTo(offsetX + ch.x * zoom, offsetY + (ch.y - 8) * zoom);
+    ctx.stroke();
+  }
+  ctx.restore();
 
   // Furniture
   for (const f of furniture) {
@@ -524,6 +552,37 @@ function renderBubbles(
   zoom: number,
 ): void {
   for (const ch of characters) {
+    if (!ch.bubbleType && ch.activityBubbleText && ch.activityBubbleTimer > 0) {
+      const alpha = Math.min(1, ch.activityBubbleTimer / BUBBLE_FADE_DURATION_SEC);
+      const sittingOff = ch.state === CharacterState.TYPE ? BUBBLE_SITTING_OFFSET_PX : 0;
+      const fontSize = 6 * zoom;
+      const paddingX = 3 * zoom;
+      const paddingY = 2 * zoom;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = `${fontSize}px "FS Pixel Sans"`;
+      ctx.textBaseline = 'top';
+      const textWidth = Math.ceil(ctx.measureText(ch.activityBubbleText).width);
+      const width = textWidth + paddingX * 2;
+      const height = fontSize + paddingY * 2;
+      const x = Math.round(offsetX + ch.x * zoom - width / 2);
+      const y = Math.round(
+        offsetY + (ch.y + sittingOff - BUBBLE_VERTICAL_OFFSET_PX) * zoom - height - 2 * zoom,
+      );
+      ctx.fillStyle = ACTIVITY_BUBBLE_SHADOW;
+      ctx.fillRect(x + 2 * zoom, y + 2 * zoom, width, height);
+      ctx.fillStyle = ACTIVITY_BUBBLE_BG;
+      ctx.fillRect(x, y, width, height);
+      ctx.strokeStyle = ACTIVITY_BUBBLE_BORDER;
+      ctx.lineWidth = zoom;
+      ctx.strokeRect(x, y, width, height);
+      ctx.fillStyle = ACTIVITY_BUBBLE_BORDER;
+      ctx.fillRect(Math.round(x + width / 2 - zoom), y + height, 3 * zoom, 2 * zoom);
+      ctx.fillStyle = ACTIVITY_BUBBLE_TEXT;
+      ctx.fillText(ch.activityBubbleText, x + paddingX, y + paddingY);
+      ctx.restore();
+      continue;
+    }
     if (!ch.bubbleType) continue;
     // The green checkmark bubble only represents "done" (turn finished). The
     // idle "Waiting for input" state communicates via its overlay label, not a

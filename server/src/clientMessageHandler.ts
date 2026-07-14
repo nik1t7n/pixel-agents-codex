@@ -238,6 +238,9 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
   const folderNames: Record<number, string> = {};
   const externalAgents: Record<number, boolean> = {};
   const sessionIds: Record<number, string> = {};
+  const parentAgentIds: Record<number, number> = {};
+  const agentNames: Record<number, string> = {};
+  const activeAgentIds: number[] = [];
   for (const [id, agent] of store) {
     agentIds.push(id);
     sessionIds[id] = agent.sessionId;
@@ -246,6 +249,15 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
     }
     if (agent.isExternal) {
       externalAgents[id] = true;
+    }
+    if (agent.leadAgentId !== undefined) {
+      parentAgentIds[id] = agent.leadAgentId;
+    }
+    if (agent.agentName) {
+      agentNames[id] = agent.agentName;
+    }
+    if (!agent.isWaiting) {
+      activeAgentIds.push(id);
     }
   }
   const seats = adapter?.loadSeats() ?? {};
@@ -256,6 +268,9 @@ function handleWebviewReady(send: WsSend, ctx: ClientMessageContext): void {
     folderNames,
     externalAgents,
     sessionIds,
+    parentAgentIds,
+    agentNames,
+    activeAgentIds,
   });
 }
 

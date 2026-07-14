@@ -125,6 +125,9 @@ export interface ExistingAgents {
   folderNames: Record<string, string>;
   externalAgents: Record<string, boolean>;
   sessionIds: Record<string, string>;
+  parentAgentIds: Record<string, number>;
+  agentNames: Record<string, string>;
+  activeAgentIds: number[];
 }
 
 export interface AgentSeatMeta {

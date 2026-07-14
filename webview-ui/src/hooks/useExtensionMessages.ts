@@ -27,6 +27,15 @@ export interface SubagentCharacter {
   label: string;
 }
 
+interface HiddenTeammate {
+  parentAgentId: number;
+  palette?: number;
+  hueShift?: number;
+  folderName?: string;
+  agentName?: string;
+  teamName?: string;
+}
+
 interface FurnitureAsset {
   id: string;
   name: string;
@@ -128,6 +137,8 @@ export function useExtensionMessages(
   const layoutReadyRef = useRef(false);
 
   useEffect(() => {
+    const hiddenTeammates = new Map<number, HiddenTeammate>();
+    const activeAgentIds = new Set<number>();
     // Buffer agents from existingAgents until layout is loaded
     let pendingAgents: Array<{
       id: number;
@@ -137,6 +148,36 @@ export function useExtensionMessages(
       folderName?: string;
       sessionId?: string;
     }> = [];
+
+    const showTeammate = (id: number, os: OfficeState): void => {
+      const meta = hiddenTeammates.get(id);
+      if (!meta) return;
+      const parent = os.characters.get(meta.parentAgentId);
+      os.addAgent(
+        id,
+        meta.palette ?? parent?.palette,
+        meta.hueShift ?? parent?.hueShift,
+        undefined,
+        undefined,
+        meta.folderName ?? parent?.folderName,
+      );
+      const ch = os.characters.get(id);
+      if (ch) {
+        ch.leadAgentId = meta.parentAgentId;
+        ch.teamName = meta.teamName ?? parent?.teamName;
+        ch.agentName = meta.agentName ?? 'subagent';
+      }
+      setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    };
+
+    const hideTeammate = (id: number, os: OfficeState): void => {
+      if (!hiddenTeammates.has(id)) return;
+      os.setAgentTool(id, null);
+      os.setAgentActive(id, false);
+      os.removeAgent(id);
+      setAgents((prev) => prev.filter((agentId) => agentId !== id));
+      setSelectedAgent((prev) => (prev === id ? null : prev));
+    };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (msg: any) => {
@@ -176,6 +217,8 @@ export function useExtensionMessages(
         setSessionError(null);
         if (!msg.selectedSession) {
           os.clearAgents();
+          hiddenTeammates.clear();
+          activeAgentIds.clear();
           pendingAgents = [];
           setAgents([]);
           setSelectedAgent(null);
@@ -234,31 +277,28 @@ export function useExtensionMessages(
         const teammateName = msg.teammateName as string | undefined;
         const teammateParentId = msg.parentAgentId as number | undefined;
         const teamName = msg.teamName as string | undefined;
+        if (isTeammate && teammateParentId !== undefined) {
+          hiddenTeammates.set(id, {
+            parentAgentId: teammateParentId,
+            palette,
+            hueShift: 0,
+            folderName,
+            agentName: teammateName,
+            teamName,
+          });
+          return;
+        }
         setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]));
         // Don't auto-select teammates (keep focus on lead)
         if (!isTeammate) {
           setSelectedAgent(id);
         }
-        if (isTeammate && teammateParentId !== undefined) {
-          // Teammate: inherit parent's palette and workspace folderName (teammate runs
-          // in the same workspace as the lead). Name shown via agentName (teamRoleLabel).
-          const parentCh = os.characters.get(teammateParentId);
-          const teammatePalette = parentCh ? parentCh.palette : palette;
-          const hueShift = parentCh ? parentCh.hueShift : undefined;
-          os.addAgent(id, teammatePalette, hueShift, undefined, undefined, parentCh?.folderName);
-          // Set team metadata on the character
-          const ch = os.characters.get(id);
-          if (ch) {
-            ch.leadAgentId = teammateParentId;
-            ch.teamName = teamName ?? parentCh?.teamName;
-            ch.agentName = teammateName;
-          }
-        } else {
-          os.addAgent(id, palette, 0, undefined, undefined, folderName);
-        }
+        os.addAgent(id, palette, 0, undefined, undefined, folderName);
         saveAgentSeats(os);
       } else if (msg.type === 'agentClosed') {
         const id = msg.id as number;
+        hiddenTeammates.delete(id);
+        activeAgentIds.delete(id);
         setAgents((prev) => prev.filter((a) => a !== id));
         setSelectedAgent((prev) => (prev === id ? null : prev));
         setAgentTools((prev) => {
@@ -291,9 +331,28 @@ export function useExtensionMessages(
         >;
         const folderNames = (msg.folderNames || {}) as Record<number, string>;
         const sessionIds = (msg.sessionIds || {}) as Record<number, string>;
+        const parentAgentIds = (msg.parentAgentIds || {}) as Record<number, number>;
+        const agentNames = (msg.agentNames || {}) as Record<number, string>;
+        const activeIncoming = new Set((msg.activeAgentIds || []) as number[]);
         // Buffer agents — they'll be added in layoutLoaded after seats are built
         for (const id of incoming) {
           const m = meta[id];
+          const parentAgentId = parentAgentIds[id];
+          if (parentAgentId !== undefined) {
+            hiddenTeammates.set(id, {
+              parentAgentId,
+              palette: sessionPalette(sessionIds[id]) ?? m?.palette,
+              hueShift: sessionIds[id] ? 0 : m?.hueShift,
+              folderName: folderNames[id],
+              agentName: agentNames[id],
+            });
+            if (activeIncoming.has(id)) {
+              activeAgentIds.add(id);
+              showTeammate(id, os);
+              os.setAgentActive(id, true);
+            }
+            continue;
+          }
           pendingAgents.push({
             id,
             palette: sessionPalette(sessionIds[id]) ?? m?.palette,
@@ -307,6 +366,7 @@ export function useExtensionMessages(
           const ids = new Set(prev);
           const merged = [...prev];
           for (const id of incoming) {
+            if (parentAgentIds[id] !== undefined) continue;
             if (!ids.has(id)) {
               merged.push(id);
             }
@@ -318,6 +378,8 @@ export function useExtensionMessages(
         const toolId = msg.toolId as string;
         const status = msg.status as string;
         const permissionActive = msg.permissionActive as boolean | undefined;
+        activeAgentIds.add(id);
+        showTeammate(id, os);
         setAgentTools((prev) => {
           const list = prev[id] || [];
           if (list.some((t) => t.toolId === toolId)) return prev;
@@ -368,6 +430,7 @@ export function useExtensionMessages(
         });
       } else if (msg.type === 'agentToolsClear') {
         const id = msg.id as number;
+        activeAgentIds.delete(id);
         setAgentTools((prev) => {
           if (!(id in prev)) return prev;
           const next = { ...prev };
@@ -390,6 +453,7 @@ export function useExtensionMessages(
           os.removeAllSubagents(id);
           setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id));
         }
+        hideTeammate(id, os);
         os.setAgentTool(id, null);
         os.clearPermissionBubble(id);
       } else if (msg.type === 'agentSelected') {
@@ -398,6 +462,12 @@ export function useExtensionMessages(
       } else if (msg.type === 'agentStatus') {
         const id = msg.id as number;
         const status = msg.status as string;
+        if (status === 'active') {
+          activeAgentIds.add(id);
+          showTeammate(id, os);
+        } else {
+          activeAgentIds.delete(id);
+        }
         setAgentStatuses((prev) => {
           if (status === 'active') {
             if (!(id in prev)) return prev;
@@ -411,6 +481,7 @@ export function useExtensionMessages(
         if (status === 'waiting') {
           os.showWaitingBubble(id, msg.awaitingInput === true);
           playDoneSound();
+          hideTeammate(id, os);
         }
       } else if (msg.type === 'agentToolPermission') {
         const id = msg.id as number;
@@ -588,12 +659,27 @@ export function useExtensionMessages(
         }
       } else if (msg.type === 'agentTeamInfo') {
         const id = msg.id as number;
+        const leadAgentId = msg.leadAgentId as number | undefined;
+        if (leadAgentId !== undefined) {
+          const current = hiddenTeammates.get(id);
+          hiddenTeammates.set(id, {
+            parentAgentId: leadAgentId,
+            palette: current?.palette,
+            hueShift: current?.hueShift,
+            folderName: (msg.folderName as string | undefined) ?? current?.folderName,
+            agentName: (msg.agentName as string | undefined) ?? current?.agentName,
+            teamName: (msg.teamName as string | undefined) ?? current?.teamName,
+          });
+          if (!activeAgentIds.has(id)) {
+            hideTeammate(id, os);
+          }
+        }
         os.setTeamInfo(
           id,
           msg.teamName as string | undefined,
           msg.agentName as string | undefined,
           msg.isTeamLead as boolean | undefined,
-          msg.leadAgentId as number | undefined,
+          leadAgentId,
           msg.teamUsesTmux as boolean | undefined,
           msg.folderName as string | undefined,
         );

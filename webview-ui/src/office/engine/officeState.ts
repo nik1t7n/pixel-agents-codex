@@ -1,4 +1,5 @@
 import {
+  ACTIVITY_BUBBLE_DURATION_SEC,
   AUTO_ON_FACING_DEPTH,
   AUTO_ON_SIDE_DEPTH,
   CHARACTER_HIT_HALF_WIDTH,
@@ -26,7 +27,7 @@ import {
 import { findPath, getWalkableTiles, isWalkable } from '../layout/tileMap.js';
 import { getPetCount, getPetName } from '../sprites/petSpriteData.js';
 import { getLoadedCharacterCount } from '../sprites/spriteData.js';
-import { agentActivityKind } from '../toolUtils.js';
+import { agentActivityKind, agentActivityText } from '../toolUtils.js';
 import type {
   Character,
   FurnitureInstance,
@@ -325,7 +326,15 @@ export class OfficeState {
     skipSpawnEffect?: boolean,
     folderName?: string,
   ): void {
-    if (this.characters.has(id)) return;
+    const existing = this.characters.get(id);
+    if (existing) {
+      if (existing.matrixEffect === 'despawn') {
+        existing.matrixEffect = 'spawn';
+        existing.matrixEffectTimer = 0;
+        existing.matrixEffectSeeds = matrixEffectSeeds();
+      }
+      return;
+    }
 
     let palette: number;
     let hueShift: number;
@@ -714,6 +723,11 @@ export class OfficeState {
     if (ch) {
       ch.currentTool = tool;
       ch.activityKind = tool ? agentActivityKind(tool, status) : undefined;
+      const text = tool ? agentActivityText(tool, status) : null;
+      if (text !== ch.activityBubbleText) {
+        ch.activityBubbleText = text;
+        ch.activityBubbleTimer = text ? ACTIVITY_BUBBLE_DURATION_SEC : 0;
+      }
     }
   }
 
@@ -960,6 +974,13 @@ export class OfficeState {
         if (ch.bubbleTimer <= 0) {
           ch.bubbleType = null;
           ch.bubbleTimer = 0;
+        }
+      }
+      if (ch.activityBubbleTimer > 0) {
+        ch.activityBubbleTimer -= dt;
+        if (ch.activityBubbleTimer <= 0) {
+          ch.activityBubbleText = null;
+          ch.activityBubbleTimer = 0;
         }
       }
     }

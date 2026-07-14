@@ -175,6 +175,10 @@ export interface Character {
   waitingAwaitingInput?: boolean;
   /** Countdown timer for bubble (waiting: 2→0, permission: unused) */
   bubbleTimer: number;
+  /** Short activity message shown only after the activity changes. */
+  activityBubbleText: string | null;
+  /** Remaining lifetime for the transient activity message. */
+  activityBubbleTimer: number;
   /** Timer to stay seated while inactive after seat reassignment (counts down to 0) */
   seatTimer: number;
   /** Whether this character represents a sub-agent (spawned by Task tool) */
