@@ -14,6 +14,7 @@ export class WebSocketTransport implements MessageTransport {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
   private pendingMessages: ClientMessage[] = [];
+  private readyMessage: ClientMessage | null = null;
 
   constructor(url: string) {
     this.url = url;
@@ -27,6 +28,7 @@ export class WebSocketTransport implements MessageTransport {
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
       console.log('[Transport] WebSocket connected');
+      if (this.readyMessage) this.ws!.send(JSON.stringify(this.readyMessage));
       // Flush any messages queued while connecting
       for (const msg of this.pendingMessages) {
         this.ws!.send(JSON.stringify(msg));
@@ -55,6 +57,11 @@ export class WebSocketTransport implements MessageTransport {
   }
 
   send(message: ClientMessage): void {
+    if (message.type === 'webviewReady') {
+      this.readyMessage = message;
+      if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(message));
+      return;
+    }
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     } else {

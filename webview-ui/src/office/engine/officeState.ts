@@ -667,6 +667,28 @@ export class OfficeState {
     ch.wanderLimit = Number.MAX_SAFE_INTEGER;
   }
 
+  setAgentContextCompacting(id: number): void {
+    const ch = this.characters.get(id);
+    if (!ch) return;
+
+    this.setAgentActive(id, false);
+    this.setAgentThought(id, 'Сжимаю контекст…');
+
+    const sofas = this.layout.furniture.filter((item) => item.type.startsWith('SOFA_'));
+    if (sofas.length === 0) return;
+
+    const target = this.walkableTiles.reduce<{ col: number; row: number; distance: number } | null>(
+      (closest, tile) => {
+        const distance = Math.min(
+          ...sofas.map((sofa) => Math.abs(tile.col - sofa.col) + Math.abs(tile.row - sofa.row)),
+        );
+        return !closest || distance < closest.distance ? { ...tile, distance } : closest;
+      },
+      null,
+    );
+    if (target) this.walkToTile(id, target.col, target.row);
+  }
+
   /** Rebuild furniture instances with auto-state applied (active agents turn electronics ON) */
   private rebuildFurnitureInstances(): void {
     // Collect tiles where active agents face desks

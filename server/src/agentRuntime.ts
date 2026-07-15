@@ -296,9 +296,42 @@ export class AgentRuntime {
       sessionId: lead.sessionId,
     });
 
-    const agentIdsBySession = new Map<string, number>([[session.id, lead.id]]);
-    for (const child of session.children ?? []) {
-      if (!isCodexSessionActive(child.transcriptPath)) continue;
+    this.syncSelectedSession(session);
+    this.store.persist();
+    return lead.id;
+  }
+
+  syncSelectedSession(session: {
+    id: string;
+    children?: Array<{
+      id: string;
+      parentThreadId: string;
+      transcriptPath: string;
+      cwd?: string;
+      nickname?: string;
+      role?: string;
+    }>;
+  }): void {
+    if (this.selectedRootSessionId !== session.id) return;
+    const lead = [...this.store.values()].find((agent) => agent.sessionId === session.id);
+    if (!lead) return;
+
+    const activeChildren = (session.children ?? []).filter((child) =>
+      isCodexSessionActive(child.transcriptPath),
+    );
+    const activeSessionIds = new Set(activeChildren.map((child) => child.id));
+    for (const [id, agent] of [...this.store.entries()]) {
+      if (agent.isTeamLead || agent.teamName !== session.id) continue;
+      if (activeSessionIds.has(agent.sessionId)) continue;
+      this.selectedSessionIds.delete(agent.sessionId);
+      this.unregisterAgent(agent.sessionId);
+      this.removeAgent(id);
+    }
+
+    const agentIdsBySession = new Map<string, number>();
+    for (const [id, agent] of this.store) agentIdsBySession.set(agent.sessionId, id);
+    for (const child of activeChildren) {
+      if (agentIdsBySession.has(child.id)) continue;
       this.dismissalTracker.clearDismissal(child.transcriptPath);
       this.dismissalTracker.clearPermanentDismissal(child.transcriptPath);
       adoptExternalSessionFromHook(
@@ -337,7 +370,6 @@ export class AgentRuntime {
       );
     }
     this.store.persist();
-    return lead.id;
   }
 
   closeSelectedSession(): void {

@@ -407,7 +407,9 @@ export function useExtensionMessages(
         });
         const toolName = (msg.toolName as string | undefined) ?? extractToolName(status);
         os.setAgentTool(id, toolName, status);
-        if (toolName === 'wait_agent' || toolName === 'wait') {
+        if (toolName === 'ContextCompact') {
+          os.setAgentContextCompacting(id);
+        } else if (toolName === 'wait_agent' || toolName === 'wait') {
           os.setAgentWaitingForAgents(id);
         } else {
           os.setAgentActive(id, true);
@@ -419,6 +421,7 @@ export function useExtensionMessages(
       } else if (msg.type === 'agentToolDone') {
         const id = msg.id as number;
         const toolId = msg.toolId as string;
+        if (toolId === 'codex-context-compaction') os.setAgentActive(id, true);
         setAgentTools((prev) => {
           const list = prev[id];
           if (!list) return prev;

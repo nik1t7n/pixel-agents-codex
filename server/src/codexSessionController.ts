@@ -10,12 +10,16 @@ import {
 
 export class CodexSessionController {
   private selected: CodexSessionDetails | null = null;
+  private readonly refreshTimer: ReturnType<typeof setInterval>;
 
   constructor(
     private readonly runtime: AgentRuntime,
     private readonly store: AgentStateStore,
     private readonly catalog = new CodexSessionCatalog(),
-  ) {}
+  ) {
+    this.refreshTimer = setInterval(() => this.refreshSelected(), 1000);
+    this.refreshTimer.unref();
+  }
 
   listSessions(): CodexSessionSummary[] {
     return this.catalog.listSessions(1000);
@@ -44,6 +48,18 @@ export class CodexSessionController {
     this.runtime.closeSelectedSession();
     this.selected = null;
     this.setPersistenceScope(null);
+  }
+
+  dispose(): void {
+    clearInterval(this.refreshTimer);
+  }
+
+  private refreshSelected(): void {
+    if (!this.selected) return;
+    const current = this.catalog.getSession(this.selected.id);
+    if (!current) return;
+    this.selected = current;
+    this.runtime.syncSelectedSession(current);
   }
 
   private setPersistenceScope(sessionId: string | null): void {

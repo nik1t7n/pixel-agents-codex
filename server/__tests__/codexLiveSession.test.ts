@@ -81,4 +81,35 @@ describe('Codex selected-session live roster', () => {
     expect([...store.values()].some((agent) => agent.sessionId === unrelatedId)).toBe(false);
     runtime.dispose();
   });
+
+  it('reconciles children created and completed after the selected session opens', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pixel-codex-live-sync-fixture-'));
+    tempRoots.push(dir);
+    const rootId = '019f5fcb-ca7a-7472-b593-c99784a1a248';
+    const childId = '019f5fcb-ca7a-7472-b593-c99784a1a249';
+    const store = new AgentStateStore();
+    const runtime = new AgentRuntime(store, codexProvider);
+
+    runtime.openSelectedSession({ id: rootId, transcriptPath: transcript(dir, rootId, null) });
+    const childPath = transcript(dir, childId, rootId);
+    fs.appendFileSync(
+      childPath,
+      `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_started' } })}\n`,
+    );
+    const selected = {
+      id: rootId,
+      children: [{ id: childId, parentThreadId: rootId, transcriptPath: childPath }],
+    };
+
+    runtime.syncSelectedSession(selected);
+    expect([...store.values()].some((agent) => agent.sessionId === childId)).toBe(true);
+
+    fs.appendFileSync(
+      childPath,
+      `${JSON.stringify({ type: 'event_msg', payload: { type: 'task_complete' } })}\n`,
+    );
+    runtime.syncSelectedSession(selected);
+    expect([...store.values()].some((agent) => agent.sessionId === childId)).toBe(false);
+    runtime.dispose();
+  });
 });

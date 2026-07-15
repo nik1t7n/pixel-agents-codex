@@ -33,6 +33,7 @@ export function formatCodexToolStatus(toolName: string, input?: unknown): string
   if (toolName === 'view_image') return shortFile ? `Viewing ${shortFile}` : 'Viewing an image';
   if (toolName === 'read_mcp_resource') return 'Reading a connected resource';
   if (toolName === 'web__run') return 'Browsing the web';
+  if (toolName === 'ContextCompact') return 'Compacting context';
   if (toolName === 'wait' || toolName === 'wait_agent') return 'Waiting for agents';
   if (toolName.includes('spawn_agent')) return 'Starting a subagent';
   if (toolName.includes('send_message') || toolName.includes('followup_task')) {

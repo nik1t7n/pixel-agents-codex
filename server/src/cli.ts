@@ -150,6 +150,7 @@ async function main(): Promise<void> {
     // ── Graceful shutdown ──
     function shutdown(): void {
       console.log('\nShutting down...');
+      sessionController.dispose();
       runtime.dispose();
       server.stop();
       process.exit(0);
